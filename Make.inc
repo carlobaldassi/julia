@@ -47,7 +47,7 @@ endif
 
 # If OpenBLAS doesn't build, find your architechure at the following URL and enter it below
 # https://github.com/xianyi/OpenBLAS/blob/master/GotoBLAS_01Readme.txt
-TARGET_OPENBLAS_ARCH=
+TARGET_OPENBLAS_ARCH=NEHALEM
 
 # Use libraries available on the system instead of building them
 
