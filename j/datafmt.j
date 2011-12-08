@@ -87,7 +87,13 @@ function _jl_dlmread_setup(fname::String, dlm::Char)
     return (f, nr, nc, row)
 end
 
-function dlmread(fname::String, dlm::Char, T::Type)
+dlmread(fname::String) = dlmread(fname, (' ', ',', '\t', '\r', '\v'))
+
+dlmread(fname::String, dlm::Char, T::Type) = dlmread(fname, (dlm,), T)
+
+dlmread(fname::String, dlm::Char) = dlmread(fname, (dlm,))
+
+function dlmread(fname::String, dlm::(Char...), T::Type)
     (f, nr, nc, row) = _jl_dlmread_setup(fname, dlm)
     a = Array(T, nr, nc)
     _jl_dlmread(a, f, dlm, nr, nc, row)
@@ -95,7 +101,7 @@ function dlmread(fname::String, dlm::Char, T::Type)
     return a
 end
 
-function dlmread(fname::String, dlm::Char)
+function dlmread(fname::String, dlm::(Char...))
     (f, nr, nc, row) = _jl_dlmread_setup(fname, dlm)
     a = Array(Float64, nr, nc)
     a = _jl_dlmread_auto(a, f, dlm, nr, nc, row)
