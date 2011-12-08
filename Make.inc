@@ -43,7 +43,7 @@ USE_SYSTEM_READLINE=0
 
 # If OpenBLAS doesn't build, find your architechure at the following URL and enter it below
 # https://github.com/xianyi/OpenBLAS/blob/master/GotoBLAS_01Readme.txt
-TARGET_OPENBLAS_ARCH=
+TARGET_OPENBLAS_ARCH=NEHALEM
 
 
 ifeq ($(OS), Linux)

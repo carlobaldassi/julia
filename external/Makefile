@@ -179,7 +179,7 @@ openblas-$(OPENBLAS_VER)/Makefile: openblas-$(OPENBLAS_VER).tar.gz
 	tar -C openblas-$(OPENBLAS_VER) --strip-components 1 -xf $<
 	touch $@
 $(OPENBLAS_OBJ_SOURCE): openblas-$(OPENBLAS_VER)/Makefile
-	$(MAKE) -C openblas-$(OPENBLAS_VER) DYNAMIC_ARCH=1 USE_THREAD=0 NO_LAPACK=1 CC=$(CC) FC=$(FC) TARGET=$(TARGET_OPENBLAS_ARCH)
+	$(MAKE) -C openblas-$(OPENBLAS_VER) USE_THREAD=1 NO_LAPACK=1 CC=$(CC) FC=$(FC) TARGET=$(TARGET_OPENBLAS_ARCH)
 
 clean-openblas:
 	$(MAKE) -C openblas-$(OPENBLAS_VER) clean
