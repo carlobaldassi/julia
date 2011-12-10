@@ -79,13 +79,15 @@ function _jl_dlmread_auto(a, f, dlm, nr, nc, row)
     a
 end
 
-function _jl_dlmread_setup(fname::String, dlm::Char)
+function _jl_dlmread_setup(fname::String, dlm::(Char...))
     nr = int(split(readall(`wc -l $fname`),' ',false)[1])
     f = open(fname)
     row = _jl_dlm_readrow(f, dlm)
     nc = length(row)
     return (f, nr, nc, row)
 end
+
+dlmread(fname::String, T::Type) = dlmread(fname, (' ', ',', '\t', '\r', '\v'), T)
 
 dlmread(fname::String) = dlmread(fname, (' ', ',', '\t', '\r', '\v'))
 
