@@ -28,15 +28,6 @@ type Graph
 	end
 end
 
-type SGraph
-	nodes::Vector{Node}
-	edges::Vector{Edge}
-
-	function SGraph()
-		new({}, {})
-	end
-end
-
 function dpush{T}(a::DArray{T}, x::T)
 	if (length(a) > 0)
 		a = [ a, x ]
@@ -60,10 +51,6 @@ function graph_add_edge(g::Graph, n1::Node, n2::Node, x::Real)
 	return g
 end
 
-#function fake_distribute{T}(a::Array{T})
-#	darray((T,d,da)->a, T, size(a), 1, [1])
-#end
-
 function generate_graph{T <: Real}(edges::Vector{(Node, Node, T)})
 	g = Graph()
 	for e = edges
@@ -72,7 +59,8 @@ function generate_graph{T <: Real}(edges::Vector{(Node, Node, T)})
 	return g
 end
 
-function update_var(n::Node)
+function update_node(nrr::RemoteRef)
+	n = take(nrr)
 	s = 0.
 	for e = n.edges
 		s += e.x
@@ -83,13 +71,17 @@ end
 function graph_iterate(g::Graph)
 	#### This doesn't work: ####
 	#@parallel for i = 1 : length(g.nodes)
-	#for i = 1 : length(g.nodes)
-	#	update_var(g.nodes[i])
+	#	rr = RemoteRef()
+	#	put(rr, g.nodes[i])
+	#	update_var(rr)
 	#end
 	########
 	@sync begin
 		for i = 1 : length(g.nodes)
-			@spawnat owner(g.nodes, i) update_var(g.nodes[i])
+			rr = RemoteRef()
+			put(rr, g.nodes[i])
+			@spawnat owner(g.nodes, i) update_node(rr)
+			#@spawn update_node(rr) # using this shows that there are problems if not using RemoteRef
 		end
 	end
 end
