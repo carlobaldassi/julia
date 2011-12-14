@@ -1,4 +1,4 @@
-abstract aNode # neede to define Edge
+abstract aNode # needed to define Edge
 
 type Edge
 	n1::aNode
