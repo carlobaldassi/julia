@@ -1,0 +1,3 @@
+#!/bin/bash
+
+grep  '\<const\>' ../jl/errno_h.jl  | awk '{print $2}' | gen_trie.py

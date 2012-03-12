@@ -1,0 +1,3 @@
+#!/bin/bash
+
+cat ../jl/pcre_h.jl ../jl/pcre.jl | grep  '\<const\>'  | awk '{print $2}' | gen_trie.py
