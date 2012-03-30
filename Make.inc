@@ -113,7 +113,9 @@ else
 LIBBLAS = -lblas
 endif
 else
-LIBBLAS = $(JULIAHOME)/external/openblas-$(OPENBLAS_VER)/libopenblas.a
+#LIBBLAS = $(JULIAHOME)/external/openblas-$(OPENBLAS_VER)/libopenblas.a
+MKL_LIB = /opt/intel/mkl/lib/intel64
+LIBBLAS = -Wl,--start-group  $(MKL_LIB)/libmkl_intel_lp64.a  $(MKL_LIB)/libmkl_intel_thread.a $(MKL_LIB)/libmkl_core.a -Wl,--end-group -liomp5 -lpthread -lm
 endif
 
 ifeq ($(USE_SYSTEM_LAPACK), 1)
