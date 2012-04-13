@@ -11,6 +11,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <ctype.h>
 #include "julia.h"
 #include "builtin_proto.h"
 
@@ -731,7 +732,16 @@ DLLEXPORT int jl_strtod(char *str, double *out)
     char *p;
     errno = 0;
     *out = strtod(str, &p);
-    return (p == str || errno != 0);
+    if (p == str || errno != 0)
+        return 1;
+    else {
+        int l = strlen(str);
+        while ((p != str + l) && isspace(*p))
+            ++p;
+        if (p == str + l)
+            return 0;
+    }
+    return 1;
 }
 
 DLLEXPORT int jl_strtof(char *str, float *out)
@@ -739,7 +749,16 @@ DLLEXPORT int jl_strtof(char *str, float *out)
     char *p;
     errno = 0;
     *out = strtof(str, &p);
-    return (p == str || errno != 0);
+    if (p == str || errno != 0)
+        return 1;
+    else {
+        int l = strlen(str);
+        while ((p != str + l) && isspace(*p))
+            ++p;
+        if (p == str + l)
+            return 0;
+    }
+    return 1;
 }
 
 // showing --------------------------------------------------------------------
