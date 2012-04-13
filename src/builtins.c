@@ -12,6 +12,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <ctype.h>
+#include <math.h>
 #include "julia.h"
 #include "builtin_proto.h"
 
@@ -732,7 +733,7 @@ DLLEXPORT int jl_strtod(char *str, double *out)
     char *p;
     errno = 0;
     *out = strtod(str, &p);
-    if (p == str || errno != 0)
+    if (p == str || (errno != 0 && (*out == 0. || isinf(*out))))
         return 1;
     else {
         int l = strlen(str);
@@ -749,7 +750,7 @@ DLLEXPORT int jl_strtof(char *str, float *out)
     char *p;
     errno = 0;
     *out = strtof(str, &p);
-    if (p == str || errno != 0)
+    if (p == str || (errno != 0 && (*out == 0. || isinf(*out))))
         return 1;
     else {
         int l = strlen(str);
