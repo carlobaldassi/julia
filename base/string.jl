@@ -860,20 +860,25 @@ end
 strip(s::String) = lstrip(rstrip(s))
 
 ## string to integer functions ##
+function _jl_str_consume_whitespace(s::String, i)
+    while true
+        if done(s,i)
+            return (true, '\0', i)
+        end
+        c,i = next(s,i)
+        if !iswspace(c)
+            return (false, c, i)
+        end
+    end
+end
 
 function parse_int{T<:Integer}(::Type{T}, s::String, base::Integer)
     if !(2 <= base <= 36); error("invalid base: ",base); end
     i = start(s)
-    while true
-        if done(s,i)
-            #throw(ArgumentError(strcat("premature end of integer (in ",show_to_string(s),")")))
-            throw(ArgumentError("parse_int: premature end of integer)"))
-            #error("premature end of integer (in ",show_to_string(s),")")
-        end
-        c,i = next(s,i)
-        if !iswspace(c)
-            break
-        end
+    finished, c, i = _jl_str_consume_whitespace(s, i)
+    if finished
+        throw(ArgumentError("parse_int: premature end of integer)"))
+        #error("premature end of integer (in ",show_to_string(s),")")
     end
     sgn = one(T)
     if T <: Signed && c == '-'
@@ -904,21 +909,13 @@ function parse_int{T<:Integer}(::Type{T}, s::String, base::Integer)
                 throw(ArgumentError("parse_int: invalid digit"))
                 #error(show_to_string(c)," is not a valid digit (in ",show_to_string(s),")")
             end
-            finished = false
-            while true
-                if done(s,i)
-                    finished = true
-                    break
-                end
-                c,i = next(s,i)
-                if !iswspace(c)
-                    #throw(ArgumentError(strcat("extra characters after whitespace (in ",show_to_string(s),")")))
-                    throw(ArgumentError("parse_int: extra characters after whitespace"))
-                    #error("extra characters after whitespace (in ",show_to_string(s),")")
-                end
-            end
+            finished, c, i = _jl_str_consume_whitespace(s, i)
             if finished
                 break
+            else
+                #throw(ArgumentError(strcat("extra characters after whitespace (in ",show_to_string(s),")")))
+                throw(ArgumentError("parse_int: extra characters after whitespace"))
+                #error("extra characters after whitespace (in ",show_to_string(s),")")
             end
         end
         # TODO: overflow detection?
