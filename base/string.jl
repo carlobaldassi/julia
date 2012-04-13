@@ -1044,16 +1044,16 @@ function _jl_float_isvalid(s::String)
     allowed_A = false
     allowed_I = true
     allowed_F = false
+    allowed_end = false
 
-    needs_exp_digits = false
     is_nan = false
     is_inf = false
     while true
         if '0' <= c <= '9'
             if allowed_ldigits || allowed_rdigits || allowed_exp_digits
                 (finished, c, i) = _jl_str_consume_digits(s, i)
+                allowed_end = true
                 if finished
-                    needs_exp_digits = false
                     break
                 elseif allowed_ldigits
                     allowed_sign = false
@@ -1064,13 +1064,8 @@ function _jl_float_isvalid(s::String)
                 elseif allowed_rdigits
                     allowed_rdigits = false
                     allowed_exp = true
-                    allowed_N = false
-                    allowed_I = false
                 elseif allowed_exp_digits
-                    needs_exp_digits = false
                     allowed_exp_digits = false
-                    allowed_N = false
-                    allowed_I = false
                 end
                 continue
             else
@@ -1090,6 +1085,9 @@ function _jl_float_isvalid(s::String)
             end
         elseif c == '.'
             if allowed_dot
+                if !allowed_ldigits
+                    allowed_end = true
+                end
                 allowed_sign = false
                 allowed_ldigits = false
                 allowed_dot = false
@@ -1107,7 +1105,7 @@ function _jl_float_isvalid(s::String)
                 allowed_exp = false
                 allowed_exp_sign = true
                 allowed_exp_digits = true
-                needs_exp_digits = true
+                allowed_end = false
             else
                 # extra exp
                 return false
@@ -1124,6 +1122,8 @@ function _jl_float_isvalid(s::String)
                     is_nan = true
                 elseif is_inf
                     allowed_F = true
+                else
+                    allowed_end = true
                 end
             else
                 # extra N
@@ -1151,6 +1151,7 @@ function _jl_float_isvalid(s::String)
         elseif uppercase(c) == 'F'
             if allowed_F
                 allowed_F = false
+                allowed_end = true
             else
                 # extra F
                 return false
@@ -1166,12 +1167,8 @@ function _jl_float_isvalid(s::String)
         end
         c,i = next(s,i)
     end
-    if needs_exp_digits
-        # dangling exp
-        return false
-    end
-    if (is_nan || is_inf) && (allowed_N || allowed_A || allowed_F)
-        # incomplete NaN of Inf
+    if !allowed_end
+        # dangling exp, incomplete Nan/Inf, single dot
         return false
     end
     (finished, c, i) = _jl_str_consume_whitespace(s, i)
