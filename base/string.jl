@@ -1003,10 +1003,207 @@ cstring(x::Signed) = dec(int64(x))
 
 ## string to float functions ##
 
-float64_isvalid(s::String, out::Array{Float64,1}) =
+function _jl_str_consume_whitespace(s::String, i)
+    while true
+        if done(s,i)
+            return (true, '\0', i)
+        end
+        c,i = next(s,i)
+        if !iswspace(c)
+            return (false, c, i)
+        end
+    end
+end
+function _jl_str_consume_digits(s::String, i)
+    while true
+        if done(s,i)
+            return (true, '\0', i)
+        end
+        c,i = next(s,i)
+        if !('0' <= c <= '9')
+            return (false, c, i)
+        end
+    end
+end
+
+function _jl_float_isvalid(s::String)
+    i = start(s)
+    finished, c, i = _jl_str_consume_whitespace(s, i)
+    if finished
+        # empty string
+        return false
+    end
+    allowed_sign = true
+    allowed_ldigits = true
+    allowed_dot = true
+    allowed_rdigits = false
+    allowed_exp = false
+    allowed_exp_sign = false
+    allowed_exp_digits = false
+    allowed_N = true
+    allowed_A = false
+    allowed_I = true
+    allowed_F = false
+
+    needs_exp_digits = false
+    is_nan = false
+    is_inf = false
+    while true
+        if '0' <= c <= '9'
+            if allowed_ldigits || allowed_rdigits || allowed_exp_digits
+                (finished, c, i) = _jl_str_consume_digits(s, i)
+                if finished
+                    needs_exp_digits = false
+                    break
+                elseif allowed_ldigits
+                    allowed_sign = false
+                    allowed_ldigits = false
+                    allowed_exp = true
+                    allowed_N = false
+                    allowed_I = false
+                elseif allowed_rdigits
+                    allowed_rdigits = false
+                    allowed_exp = true
+                    allowed_N = false
+                    allowed_I = false
+                elseif allowed_exp_digits
+                    needs_exp_digits = false
+                    allowed_exp_digits = false
+                    allowed_N = false
+                    allowed_I = false
+                end
+                continue
+            else
+                # extra digit
+                return false
+            end
+        elseif c == '+' || c == '-'
+            if allowed_sign
+                allowed_sign = false
+                allowed_N = false
+                allowed_I = false
+            elseif allowed_exp_sign
+                allowed_exp_sign = false
+            else
+                # extra sign
+                return false
+            end
+        elseif c == '.'
+            if allowed_dot
+                allowed_sign = false
+                allowed_ldigits = false
+                allowed_dot = false
+                allowed_rdigits = true
+                allowed_N = false
+                allowed_I = false
+            else
+                # extra dot
+                return false
+            end
+        elseif c == 'e'
+            if allowed_exp
+                allowed_ldigits = false
+                allowed_rdigits = false
+                allowed_exp = false
+                allowed_exp_sign = true
+                allowed_exp_digits = true
+                needs_exp_digits = true
+            else
+                # extra exp
+                return false
+            end
+        elseif uppercase(c) == 'N'
+            if allowed_N
+                allowed_N = false
+                if !is_nan && !is_inf
+                    allowed_sign = false
+                    allowed_ldigits = false
+                    allowed_dot = false
+                    allowed_I = false
+                    allowed_A = true
+                    is_nan = true
+                elseif is_inf
+                    allowed_F = true
+                end
+            else
+                # extra N
+                return false
+            end
+        elseif uppercase(c) == 'A'
+            if allowed_A
+                allowed_N = true
+                allowed_A = false
+            else
+                # extra A
+                return false
+            end
+        elseif uppercase(c) == 'I'
+            if allowed_I
+                allowed_sign = false
+                allowed_ldigits = false
+                allowed_dot = false
+                allowed_I = false
+                is_inf = true
+            else
+                # extra I
+                return false
+            end
+        elseif uppercase(c) == 'F'
+            if allowed_F
+                allowed_F = false
+            else
+                # extra F
+                return false
+            end
+        elseif iswspace(c)
+            break
+        else
+            # extra chars
+            return false
+        end
+        if done(s,i)
+            break
+        end
+        c,i = next(s,i)
+    end
+    if needs_exp_digits
+        # dangling exp
+        return false
+    end
+    if (is_nan || is_inf) && (allowed_N || allowed_A || allowed_F)
+        # incomplete NaN of Inf
+        return false
+    end
+    (finished, c, i) = _jl_str_consume_whitespace(s, i)
+    if !finished
+        # chars after whitespace
+        return false
+    end
+    #cf = symbol(strcat("_jl_lowlevel_", string($f)))
+    #eval(cf)(s, out)
+    return true
+end
+
+#float64_isvalid(s::String, out::Array{Float64,1}) =
+_jl_float64_isvalid_via_strtod(s::String, out::Array{Float64,1}) =
     ccall(:jl_strtod, Int32, (Ptr{Uint8},Ptr{Float64}), s, out) == 0
-float32_isvalid(s::String, out::Array{Float32,1}) =
+#float32_isvalid(s::String, out::Array{Float32,1}) =
+_jl_float32_isvalid_via_strtod(s::String, out::Array{Float32,1}) =
     ccall(:jl_strtof, Int32, (Ptr{Uint8},Ptr{Float32}), s, out) == 0
+
+# cannot define this here! (it works if it is put in regex.jl)
+#const _jl_float_regex = r"^\s*([+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?|[Nn][Aa][Nn]|[Ii][Nn][Ff])\s*$"
+#_jl_float_isvalid_regex(s::String) = matches(_jl_float_regex, s)
+
+float64_isvalid(s::String, out::Array{Float64,1}) =
+    #_jl_float_isvalid_regex(s) && _jl_float64_isvalid_via_strtod(s, out)
+    _jl_float_isvalid(s) && _jl_float64_isvalid_via_strtod(s, out)
+    #_jl_float64_isvalid_via_strtod(s, out)
+
+float32_isvalid(s::String, out::Array{Float32,1}) =
+    #_jl_float_isvalid_regex(s) && _jl_float32_isvalid_via_strtod(s, out)
+    _jl_float_isvalid(s) && _jl_float32_isvalid_via_strtod(s, out)
+    #_jl_float32_isvalid_via_strtod(s, out)
 
 begin
     local tmp::Array{Float64,1} = Array(Float64,1)
@@ -1014,6 +1211,7 @@ begin
     global float64, float32
     function float64(s::String)
         if !float64_isvalid(s, tmp)
+            #throw(ArgumentError(strcat("float64(String): invalid number format (",show_to_string(s),")")))
             throw(ArgumentError("float64(String): invalid number format"))
         end
         return tmp[1]
@@ -1021,6 +1219,7 @@ begin
 
     function float32(s::String)
         if !float32_isvalid(s, tmpf)
+            #throw(ArgumentError(strcat("float32(String): invalid number format (",show_to_string(s),")")))
             throw(ArgumentError("float32(String): invalid number format"))
         end
         return tmpf[1]
