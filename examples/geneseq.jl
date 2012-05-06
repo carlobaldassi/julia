@@ -20,21 +20,18 @@ gC = gbase(0x1)
 gG = gbase(0x2)
 gT = gbase(0x3)
 
+const _jl_char_gbase_list = ['A', 'C', 'G', 'T']
+const _jl_gbase_list = [gA, gC, gG, gT]
+
 function convert(::Type{GBase}, x::Char)
-    if x == 'A'
-        return gA
-    elseif x == 'C'
-        return gC
-    elseif x == 'G'
-        return gG
-    elseif x == 'T'
-        return gT
-    else
-        error("invalid GBase character $x")
+    for i = 1:length(_jl_char_gbase_list)
+        if x == _jl_char_gbase_list[i]
+            return _jl_gbase_list[i]
+        end
     end
+    error("invalid GBase character $x")
 end
 
-const _jl_char_gbase_list = ['A', 'C', 'G', 'T']
 convert(::Type{Char}, g::GBase) = _jl_char_gbase_list[uint8(g)+1]
 
 (==)(g::GBase, h::Char) = (char(g) == h)
