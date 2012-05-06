@@ -37,17 +37,8 @@ function convert(::Type{GBase}, x::Char)
     end
 end
 
-function convert(::Type{Char}, g::GBase)
-    if g == gA
-        return 'A'
-    elseif g == gC
-        return 'C'
-    elseif g == gG
-        return 'G'
-    elseif g == gT
-        return 'T'
-    end
-end
+const _jl_char_gbase_list = ['A', 'C', 'G', 'T']
+convert(::Type{Char}, g::GBase) = _jl_char_gbase_list[uint8(g)+1]
 
 (==)(g::GBase, h::Char) = (char(g) == h)
 (==)(g::Char, h::GBase) = (g == char(h))
@@ -59,17 +50,8 @@ show(io, g::GBase) = print(io, char(g))
 gbaserand() = gbase(randi(4)-1)
 
 complement(g::GBase) = gbase(0x3 & ~uint8(g))
-#function complement(g::GBase)
-    #if g == gA
-        #return gT
-    #elseif g == gC
-        #return gG
-    #elseif g == gG
-        #return gC
-    #elseif g == gT
-        #return gA
-    #end
-#end
+#const _jl_compl_gbase_list = ['T', 'G', 'C', 'A']
+#complement(g::GBase) = return _jl_compl_gbase_list[uint8(g)+1]
 
 typealias GeneSeq PackedVector{GBase, 2}
 
