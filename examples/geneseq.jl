@@ -5,10 +5,10 @@ bitstype 8 GBase
 convert(::Type{GBase}, x) = convert(GBase, uint8(x))
 function convert(::Type{GBase}, x::Uint8)
     if x >= 4; error("invalid GBase value"); end
-    return box(GBase, unbox8(x))
+    return box(GBase, x)
 end
 
-convert(::Type{Uint8}, g::GBase) = boxui8(unbox8(g))
+convert(::Type{Uint8}, g::GBase) = boxui8(g)
 convert(::Type{Int}, g::GBase) = int(uint8(g))
 
 gbase(x) = convert(GBase, x)
