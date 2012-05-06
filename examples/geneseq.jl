@@ -58,17 +58,18 @@ show(io, g::GBase) = print(io, char(g))
 
 gbaserand() = gbase(randi(4)-1)
 
-function complement(g::GBase)
-    if g == gA
-        return 'T'
-    elseif g == gC
-        return 'G'
-    elseif g == gG
-        return 'C'
-    elseif g == gT
-        return 'A'
-    end
-end
+complement(g::GBase) = gbase(0x3 & ~uint8(g))
+#function complement(g::GBase)
+    #if g == gA
+        #return gT
+    #elseif g == gC
+        #return gG
+    #elseif g == gG
+        #return gC
+    #elseif g == gT
+        #return gA
+    #end
+#end
 
 typealias GeneSeq PackedVector{GBase, 2}
 
