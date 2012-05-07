@@ -103,6 +103,7 @@ To use the Intel [MKL] BLAS & LAPACK libraries, edit the following settings in `
     MKLLIB = /path/to/mkl/lib/arch
 
 `MKLLIB` points to the directory containing `libmkl_rt.so`. Requires v10.3 or greater.
+To rebuild a pre-built Julia source install with MKL support, delete from `deps/`, the OpenBLAS, ARPACK, and SuiteSparse dependencies, then run `make cleanall testall`.
 
 <a name="Required-Build-Tools-External-Libraries"/>
 ## Required Build Tools & External Libraries
@@ -164,14 +165,14 @@ Julia uses the following external libraries, which are automatically downloaded 
 ## Directories
 
     attic/         old, now-unused code
-    base/          source code for julia's standard library
-    contrib/       emacs and textmate support for julia
-    examples/      example julia programs
-    deps/      external dependencies
+    base/          source code for Julia's standard library
+    contrib/       emacs, vim and textmate support for Julia
+    deps/          external dependencies
+    examples/      example Julia programs
     extras/        useful optional libraries
-    lib/           shared libraries loaded by julia's standard libraries
-    src/           source for julia language core
-    test/          unit and function test cases
+    lib/           shared libraries loaded by Julia's standard libraries
+    src/           source for Julia language core
+    test/          unit and functional test cases
     ui/            source for various front ends
 
 <a name="Binary-Installation"/>
@@ -223,8 +224,9 @@ Use the launch-webserver script to start the webserver and web-repl.
 Point your browser to `http://localhost:2000/`.
 Try `plot(cumsum(randn(1000)))`
 
-### Run it Online
-[julia.forio.com](http://julia.forio.com)
+### Try it Online
+
+Forio.com is generously hosting and maintaining an instance of Julia's web REPL here: [julia.forio.com](http://julia.forio.com).
 
 ### Pre-installed lighttpd
 
