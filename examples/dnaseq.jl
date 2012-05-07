@@ -84,6 +84,8 @@ function dnaseq_file_read(filename::String)
 end
 
 complement(dnaseq::DNASeq) = map(complement, dnaseq)
+#TODO: improve performance
+revcomplement(dnaseq::DNASeq) = reverse!(map(complement, dnaseq))
 
 for f in (:(==), :(!=))
     @eval begin
