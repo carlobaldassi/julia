@@ -110,8 +110,8 @@ function clp_load_problem (clp_model::ClpModel,  num_cols::Integer, num_rows::In
         col_lb::Vector{Float64}, col_ub::Vector{Float64},
         obj::Vector{Float64},
         row_lb::Vector{Float64}, row_ub::Vector{Float64})
-    # TODO
-    error("TODO")
+    # todo
+    error("todo")
     return
 end
 
@@ -329,6 +329,7 @@ function clp_number_iterations(clp_model::ClpModel)
     _jl_clp__check_clp_model(clp_model)
     @clp_ccall numberIterations Int32 (Ptr{Void},) clp_model.p
 end
+clp_get_iteration_count = clp_number_iterations
 
 # Set number of iterations
 function clp_set_number_iterations(clp_model::ClpModel, iters::Integer)
@@ -568,10 +569,11 @@ function clp_get_elements(clp_model::ClpModel)
 end
 
 # Get objective value.
-function clp_objective_value(clp_model::ClpModel)
+function clp_get_obj_value(clp_model::ClpModel)
     _jl_clp__check_clp_model(clp_model)
-    @clp_ccall objectiveValue Float64 (Ptr{Void},) clp_model.p
+    @clp_ccall getObjValue Float64 (Ptr{Void},) clp_model.p
 end
+clp_objective_value = clp_get_obj_value
 
 # Get integer information.
 function clp_integer_information(clp_model::ClpModel)
@@ -689,7 +691,7 @@ end
 #   3 - as 2 plus a bit more
 #   4 - verbose
 #   above that: 8,16,32 etc just for selective debug.
-function clp_log_level(Clp_Simplex * model)
+function clp_log_level(clp_model::ClpModel)
     _jl_clp__check_clp_model(clp_model)
     @clp_ccall logLevel Int32 (Ptr{Void},) clp_model.p
 end
@@ -735,97 +737,303 @@ function clp_column_name(clp_model::ClpModel, col::Integer)
     return col_name
 end
 
-#### XXX to be continued...
+# General solve algorithm which can do presolve.
+function clp_initial_solve(clp_model::ClpModel)
+    _jl_clp__check_clp_model(clp_model)
+    @clp_ccall initialSolve Int32 (Ptr{Void},) clp_model.p
+end
 
+# Dual initial solve.
+function clp_initial_dual_solve(clp_model::ClpModel)
+    _jl_clp__check_clp_model(clp_model)
+    @clp_ccall initialDualSolve Int32 (Ptr{Void},) clp_model.p
+end
+
+# Primal initial solve.
+function clp_initial_primal_solve(clp_model::ClpModel)
+    _jl_clp__check_clp_model(clp_model)
+    @clp_ccall initialPrimalSolve Int32 (Ptr{Void},) clp_model.p
+end
+
+# Barrier initial solve.
+function clp_initial_barrier_solve(clp_model::ClpModel)
+    _jl_clp__check_clp_model(clp_model)
+    @clp_ccall initialBarrierSolve Int32 (Ptr{Void},) clp_model.p
+end
+
+# Barrier initial solve, no crossover.
+function clp_initial_barrier_no_cross_solve(clp_model::ClpModel)
+    _jl_clp__check_clp_model(clp_model)
+    @clp_ccall initialBarrierNoCrossSolve Int32 (Ptr{Void},) clp_model.p
+end
+
+# Dual algorithm.
+function clp_dual(clp_model::ClpModel)
+    _jl_clp__check_clp_model(clp_model)
+    @clp_ccall dual Int32 (Ptr{Void},) clp_model.p
+end
+
+# Primal algorithm.
+function clp_primal(clp_model::ClpModel)
+    _jl_clp__check_clp_model(clp_model)
+    @clp_ccall primal Int32 (Ptr{Void},) clp_model.p
+end
+
+# Solve the problem with the idiot code.
+function clp_idiot(clp_model::ClpModel)
+    _jl_clp__check_clp_model(clp_model)
+    @clp_ccall idiot Int32 (Ptr{Void},) clp_model.p
+end
+
+# Set or unset scaling:
+#  0 - off
+#  1 - equilibrium
+#  2 - geometric
+#  3 - auto
+#  4 - dynamic (later)
+function clp_scaling(clp_model::ClpModel, mode::Integer)
+    _jl_clp__check_clp_model(clp_model)
+    if !(0 <= mode <= 4)
+        error("Invalid clp scaling mode $mode (must be between 0 and 4)")
+    end
+    @clp_ccall scaling Void (Ptr{Void}, Int32) clp_model.p mode
+    return
+end
+
+# Get scaling flag.
+function clp_scaling_flag(clp_model::ClpModel)
+    _jl_clp__check_clp_model(clp_model)
+    return @clp_ccall scalingFlag Int32 (Ptr{Void},) clp_model.p
+end
+
+# Crash (at present just aimed at dual); returns:
+#   -2 if dual preferred and crash basis created
+#   -1 if dual preferred and all slack basis preferred
+#   0 if basis going in was not all slack
+#   1 if primal preferred and all slack basis preferred
+#   2 if primal preferred and crash basis created.
+#
+#   If gap between bounds <="gap" variables can be flipped
+#
+#   If "pivot" is:
+#     0 - No pivoting (so will just be choice of algorithm)
+#     1 - Simple pivoting e.g. gub
+#     2 - Mini iterations
+function clp_crash(clp_model::ClpModel, gap::Float64, pivot::Int32)
+    _jl_clp__check_clp_model(clp_model)
+    if !(0 <= pivot <= 2)
+        error("Invalid clp crash pivot value $pivot (must be between 0 and 2)")
+    end
+    return @clp_ccall crash Int32 (Ptr{Void}, Float64, Int32) clp_model.p gap pivot
+end
+
+# Query whether the problem is primal feasible.
+function clp_primal_feasible(clp_model::ClpModel)
+    _jl_clp__check_clp_model(clp_model)
+    ret = @clp_ccall primalFeasible Int32 (Ptr{Void},) clp_model.p
+    return ret != 0
+end
+
+# Query whether the problem is dual feasible.
+function clp_dual_feasible(clp_model::ClpModel)
+    _jl_clp__check_clp_model(clp_model)
+    ret = @clp_ccall dualFeasible Int32 (Ptr{Void},) clp_model.p
+    return ret != 0
+end
+
+# Get dual bound.
+function clp_dual_bound(clp_model::ClpModel)
+    _jl_clp__check_clp_model(clp_model)
+    @clp_ccall dualBound Float64 (Ptr{Void},) clp_model.p
+end
+
+# Set dual bound.
+function clp_set_dual_bound(clp_model::ClpModel, value::Real);
+    _jl_clp__check_clp_model(clp_model)
+    @clp_ccall setDualBound Void (Ptr{Void}, Float64) clp_model.p value
+    return
+end
+
+# Get infeasibility cost.
+function clp_infeasibility_cost(clp_model::ClpModel);
+    _jl_clp__check_clp_model(clp_model)
+    @clp_ccall infeasibilityCost Float64 (Ptr{Void},) clp_model.p
+end
+
+# Set infeasibility cost.
+function clp_set_infeasibility_cost(clp_model::ClpModel, value::Real);
+    _jl_clp__check_clp_model(clp_model)
+    @clp_ccall setInfeasibilityCost Void (Ptr{Void}, Float64) clp_model.p value
+    return
+end
+
+# Get Perturbation. Values are:
+#   50  - switch on perturbation
+#   100 - auto perturb if takes too long (1.0e-6 largest nonzero)
+#   101 - we are perturbed
+#   102 - don't try perturbing again
+# The default is 100; others are for playing.
+function Clp_perturbation(clp_model::ClpModel);
+    _jl_clp__check_clp_model(clp_model)
+    @clp_ccall perturbation Int32 (Ptr{Void},) clp_model.p
+end
+
+# Set Perturbation.
+function clp_set_perturbation(clp_model::ClpModel, value::Integer);
+    _jl_clp__check_clp_model(clp_model)
+    if !(value == 50 || value == 100 || value == 101 || value == 102)
+        error("Invalid clp perturbation value: $value (must be one of 50,100,101,102)")
+    end
+    @clp_ccall setPerturbation Void (Ptr{Void}, Int32) clp_model.p value
+    return
+end
+
+# Get current (or last) algorithm.
+function clp_algorithm(clp_model::ClpModel);
+    _jl_clp__check_clp_model(clp_model)
+    @clp_ccall algorithm Int32 (Ptr{Void},) clp_model.p
+end
+
+# Set algorithm.
+function clp_set_algorithm(clp_model::ClpModel, value::Integer);
+    _jl_clp__check_clp_model(clp_model)
+    # XXX which values of the algorithm are valid ???
+    @clp_ccall setAlgorithm Void (Ptr{Void}, Int32) clp_model.p value
+    return
+end
+
+# Get the sum of dual infeasibilities.
+function clp_sum_dual_infeasibilities(clp_model::ClpModel);
+    _jl_clp__check_clp_model(clp_model)
+    @clp_ccall sumDualInfeasibilities Float64 (Ptr{Void},) clp_model.p
+end
+
+# Get the number of dual infeasibilities.
+function clp_number_dual_infeasibilities(clp_model::ClpModel);
+    _jl_clp__check_clp_model(clp_model)
+    @clp_ccall numberDualInfeasibilities Int32 (Ptr{Void},) clp_model.p
+end
+
+# Get the sum of primal infeasibilities.
+function clp_sum_primal_infeasibilities(clp_model::ClpModel);
+    _jl_clp__check_clp_model(clp_model)
+    @clp_ccall sumPrimalInfeasibilities Float64 (Ptr{Void},) clp_model.p
+end
+
+# Get the number of primal infeasibilities.
+function clp_number_primal_infeasibilities(clp_model::ClpModel);
+    _jl_clp__check_clp_model(clp_model)
+    @clp_ccall numberPrimalInfeasibilities Int32 (Ptr{Void},) clp_model.p
+end
+
+# Save model to file, returns 0 if success.  This is designed for
+# use outside algorithms so does not save iterating arrays etc.
+# It does not save any messaging information.
+# Does not save scaling values.
+# It does not know about all types of virtual functions.
+function clp_save_model(clp_model::ClpModel, file_name::Vector{Uint8});
+    # todo
+    error("todo")
+    return # Int32 [Bool]
+end
+
+# Restore model from file, returns 0 if success,
+# deletes current model.
+function clp_restore_model(clp_model::ClpModel, file_name::Vector{Uint8});
+    # todo
+    error("todo")
+    return # Int32 [Bool]
+end
+
+# Just check solution (for external use) - sets sum of
+# infeasibilities etc.
+function clp_check_solution(clp_model::ClpModel);
+    _jl_clp__check_clp_model(clp_model)
+    @clp_ccall checkSolution Void (Ptr{Void},) clp_model.p
+    return
+end
+
+# Query whether there are numerical difficulties.
 function clp_is_abandoned(clp_model::ClpModel)
     _jl_clp__check_clp_model(clp_model)
     ret = @clp_ccall isAbandoned Int32 (Ptr{Void},) clp_model.p
     return ret != 0
 end
 
+# Query whether optimality is proven.
 function clp_is_proven_optimal(clp_model::ClpModel)
     _jl_clp__check_clp_model(clp_model)
     ret = @clp_ccall isProvenOptimal Int32 (Ptr{Void},) clp_model.p
     return ret != 0
 end
 
+# Query whether primal infeasiblity is proven.
 function clp_is_proven_primal_infeasible(clp_model::ClpModel)
     _jl_clp__check_clp_model(clp_model)
     ret = @clp_ccall isProvenPrimalInfeasible Int32 (Ptr{Void},) clp_model.p
     return ret != 0
 end
 
+# Query whether dual infeasiblity is proven.
 function clp_is_proven_dual_infeasible(clp_model::ClpModel)
     _jl_clp__check_clp_model(clp_model)
     ret = @clp_ccall isProvenDualInfeasible Int32 (Ptr{Void},) clp_model.p
     return ret != 0
 end
 
+# Query whether the given primal objective limit is reached.
 function clp_is_primal_objective_limit_reached(clp_model::ClpModel)
     _jl_clp__check_clp_model(clp_model)
     ret = @clp_ccall isPrimalObjectiveLimitReached Int32 (Ptr{Void},) clp_model.p
     return ret != 0
 end
 
+# Query whether the given dual objective limit is reached.
 function clp_is_dual_objective_limit_reached(clp_model::ClpModel)
     _jl_clp__check_clp_model(clp_model)
     ret = @clp_ccall isDualObjectiveLimitReached Int32 (Ptr{Void},) clp_model.p
     return ret != 0
 end
 
+# Query whether the iteration limit is reached
 function clp_is_iteration_limit_reached(clp_model::ClpModel)
     _jl_clp__check_clp_model(clp_model)
     ret = @clp_ccall isIterationLimitReached Int32 (Ptr{Void},) clp_model.p
     return ret != 0
 end
 
-function clp_initial_solve(clp_model::ClpModel)
+# Get the direction of optimization:
+#   1  - minimize
+#   -1 - maximize
+#   0  - ignore
+# XXX the return value is floating point, WTF???
+function clp_get_obj_sense(clp_model::ClpModel);
     _jl_clp__check_clp_model(clp_model)
-    @clp_ccall initialSolve Int32 (Ptr{Void},) clp_model.p
+    @clp_ccall getObjSense Float64 (Ptr{Void},) clp_model.p
 end
 
-function clp_initial_dual_solve(clp_model::ClpModel)
+# Set the direction of optimization.
+# XXX the value is floating point, WTF???
+function clp_set_obj_sense(clp_model::ClpModel, objsen::Real);
     _jl_clp__check_clp_model(clp_model)
-    @clp_ccall initialDualSolve Int32 (Ptr{Void},) clp_model.p
+    if !(objset == -1 || objset == 0 || objsen == 1)
+        error("Invalid clp objsense $objsense (should be -1,0 or 1)")
+    end
+    @clp_ccall setObjSense Void (Ptr{Void}, Float64) clp_model.p objsen
+    return
 end
 
-function clp_initial_primal_solve(clp_model::ClpModel)
-    _jl_clp__check_clp_model(clp_model)
-    @clp_ccall initialPrimalSolve Int32 (Ptr{Void},) clp_model.p
-end
+#### XXX to be continued...
 
-function clp_initial_barrier_solve(clp_model::ClpModel)
-    _jl_clp__check_clp_model(clp_model)
-    @clp_ccall initialBarrierSolve Int32 (Ptr{Void},) clp_model.p
-end
+# Set primal column solution.
+#COINLIBAPI void COINLINKAGE Clp_setColSolution(Clp_Simplex * model, const double * input);
+# XXX TODO
 
-function clp_initial_barrier_no_cross_solve(clp_model::ClpModel)
-    _jl_clp__check_clp_model(clp_model)
-    @clp_ccall initialBarrierNoCrossSolve Int32 (Ptr{Void},) clp_model.p
-end
+#    /** Print model for debugging purposes */
+#    COINLIBAPI void COINLINKAGE Clp_printModel(Clp_Simplex * model, const char * prefix);
+#    /* Small element value - elements less than this set to zero,
+#       default is 1.0e-20 */
+#    COINLIBAPI double COINLINKAGE Clp_getSmallElementValue(Clp_Simplex * model);
+#    COINLIBAPI void COINLINKAGE Clp_setSmallElementValue(Clp_Simplex * model, double value);
 
-function clp_dual(clp_model::ClpModel)
-    _jl_clp__check_clp_model(clp_model)
-    @clp_ccall dual Int32 (Ptr{Void},) clp_model.p
-end
-
-function clp_primal(clp_model::ClpModel)
-    _jl_clp__check_clp_model(clp_model)
-    @clp_ccall primal Int32 (Ptr{Void},) clp_model.p
-end
-
-function clp_idiot(clp_model::ClpModel)
-    _jl_clp__check_clp_model(clp_model)
-    @clp_ccall idiot Int32 (Ptr{Void},) clp_model.p
-end
-
-function clp_column_name(clp_model::ClpModel, col::Integer)
-    _jl_clp__check_clp_model(clp_model)
-    _jl_clp__check_col_is_valid(clp_model, col)
-    size = @clp_ccall lengthNames Int32 (Ptr{Void},) clp_model.p
-    col_name_p = pointer(Array(Uint8, size))
-    @clp_ccall columnName Void (Ptr{Void}, Int32, Ptr{Uint8}) clp_model.p (col-1) col_name_p
-    col_name = string(col_name_p)
-    return col_name
-end
 #}}}
