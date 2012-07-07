@@ -161,11 +161,25 @@ function exec(thunk::Function)
     exit(0)
 end
 
+type FileSink
+    s::IOStream
+    own::Bool
+end
+
+function close_sink(sink::FileSink)
+    if sink.own
+        close(sink.s)
+    end
+end
+
 type Cmd
     exec::Executable
     pipes::Dict{FileDes,PipeEnd}
     pipeline::Set{Cmd}
     pid::Int32
+    in_sink::FileSink
+    out_sink::FileSink
+    err_sink::FileSink
     status::ProcessStatus
     successful::Function
 
@@ -177,6 +191,9 @@ type Cmd
                    Dict{FileDes,PipeEnd}(),
                    Set{Cmd}(),
                    0,
+                   FileSink(stdin_stream, false),
+                   FileSink(stdout_stream, false),
+                   FileSink(stderr_stream, false),
                    ProcessNotRun(),
                    default_success)
         add(this.pipeline, this)
@@ -210,6 +227,12 @@ function show(io, cmd::Cmd)
 end
 
 exec(cmd::Cmd) = exec(cmd.exec)
+
+function close_sinks(cmd::Cmd)
+    close_sink(cmd.in_sink)
+    close_sink(cmd.out_sink)
+    close_sink(cmd.err_sink)
+end
 
 ## Port: a file descriptor on a particular command ##
 
@@ -339,6 +362,93 @@ end
 (|)(src::Ports, dst::Cmds) = (src | stdin(dst); dst)
 (|)(src::Cmds,  dst::Cmds) = (stdout(src) | stdin(dst); src & dst)
 
+redir_out(port::Port, s::IOStream, own::Bool) = (port.cmd.out_sink = FileSink(s, own))
+function redir_out(ports::Ports, s::IOStream, own::Bool)
+    for port in ports
+        redir_out(port, s, own)
+    end
+end
+
+redir_in(port::Port, s::IOStream, own::Bool) = (port.cmd.in_sink = FileSink(s, own))
+function redir_in(ports::Ports, s::IOStream, own::Bool)
+    for port in ports
+        redir_in(port, s, own)
+    end
+end
+
+redir_err(port::Port, s::IOStream, own::Bool) = (port.cmd.err_sink = FileSink(s, own))
+function redir_err(ports::Ports, s::IOStream, own::Bool)
+    for port in ports
+        redir_err(port, s, own)
+    end
+end
+
+function (>)(src::String, dest::Cmds)
+    f = open(src, "r")
+    redir_in(stdin(dest), f, true)
+    return dest
+end
+
+(<)(dest::Cmds, src::String) = (>)(src, dest)
+
+function (>)(src::IOStream, dest::Cmds)
+    redir_in(stdin(dest), src, false)
+    return dest
+end
+
+(<)(dest::Cmds, src::IOStream) = (>)(src, dest)
+
+function (>)(src::Cmds, dst::String)
+    f = open(dst, "w")
+    redir_out(stdout(src), f, true)
+    return src
+end
+
+function (>>)(src::Cmds, dst::String)
+    f = open(dst, "a")
+    redir_out(stdout(src), f, true)
+    return src
+end
+
+(<)(dest::String, src::Cmds) = (>)(src, dest)
+(<<)(dest::String, src::Cmds) = (>>)(src, dest)
+
+function (>)(src::Cmds, dst::IOStream)
+    redir_out(stdout(src), dst, false)
+    return src
+end
+
+(>>)(src::Cmds, dst::IOStream) = (>)(src, dst)
+(<)(dest::IOStream, src::Cmds) = (>)(src, dest)
+(<<)(dest::IOStream, src::Cmds) = (>>)(src, dest)
+
+function (.>)(src::Cmds, dst::String)
+    f = open(dst, "w")
+    redir_err(stderr(src), f, true)
+    return src
+end
+
+function (.>>)(src::Cmds, dst::String)
+    f = open(dst, "a")
+    redir_err(stderr(src), f, true)
+    return src
+end
+
+(.<)(dest::String, src::Cmds) = (>)(src, dest)
+(.<<)(dest::String, src::Cmds) = (>>)(src, dest)
+
+function (.>)(src::Cmds, dst::IOStream)
+    redir_err(stderr(src), dst, false)
+    return src
+end
+
+(.>>)(src::Cmds, dst::IOStream) = (.>)(src, dst)
+(.<)(dest::IOStream, src::Cmds) = (.>)(src, dest)
+(.<<)(dest::IOStream, src::Cmds) = (.>>)(src, dest)
+
+
+
+
 # spawn(cmd) starts all processes connected to cmd
 
 function spawn(cmd::Cmd)
@@ -389,6 +499,28 @@ function spawn(cmd::Cmd)
                     exit(0xff)
                 end
                 i += 2
+            end
+            if !is(c.in_sink.s, stdin_stream)
+                r = ccall(:dup2, Int32, (Int32, Int32), fd(c.in_sink.s), STDIN.fd)
+                if r == -1
+                    println(stderr_stream, "dup2: ", strerror())
+                    exit(0xff)
+                end
+            end
+            if !is(c.out_sink.s, stdout_stream)
+                r = ccall(:dup2, Int32, (Int32, Int32), fd(c.out_sink.s), STDOUT.fd)
+                if r == -1
+                    println(stderr_stream, "dup2: ", strerror())
+                    exit(0xff)
+                end
+            end
+            if !is(c.err_sink.s, stderr_stream)
+                #TODO: should save original STDERR for later potential errors
+                r = ccall(:dup2, Int32, (Int32, Int32), fd(c.err_sink.s), STDERR.fd)
+                if r == -1
+                    println(stderr_stream, "dup2: ", strerror())
+                    exit(0xff)
+                end
             end
             i = 1
             n = length(close_fds)
@@ -442,7 +574,7 @@ successful(cmd::Cmd) =
     isa(cmd.status,ProcessRunning) || cmd.successful(cmd.status)
 
 wait(cmd::Cmd, nohang::Bool) =
-    (cmd.status = process_status(wait(cmd.pid,nohang)); successful(cmd))
+    (cmd.status = process_status(wait(cmd.pid,nohang)); close_sinks(cmd); successful(cmd))
 
 # wait for a set of command processes to finish
 
