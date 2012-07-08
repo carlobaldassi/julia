@@ -421,9 +421,7 @@ function (>)(src::Cmds, dst::IOStream)
     return src
 end
 
-(>>)(src::Cmds, dst::IOStream) = (>)(src, dst)
 (<)(dst::IOStream, src::Cmds) = (>)(src, dst)
-(<<)(dst::IOStream, src::Cmds) = (>>)(src, dst)
 
 function (.>)(src::Cmds, dst::String)
     redir(stderr(src), FileSink(dst, "w"))
@@ -443,9 +441,7 @@ function (.>)(src::Cmds, dst::IOStream)
     return src
 end
 
-(.>>)(src::Cmds, dst::IOStream) = (.>)(src, dst)
 (.<)(dst::IOStream, src::Cmds) = (.>)(src, dst)
-(.<<)(dst::IOStream, src::Cmds) = (.>>)(src, dst)
 
 #TODO: here-strings
 #function (>>>)(src::String, dst::Cmds)
@@ -501,6 +497,16 @@ function spawn(cmd::Cmd)
         for f in close_fds_
             close_fds[i+=1] = f.fd
         end
+
+        # save the stderr descriptor because it may be redirected, but we may need to
+        # print errors from Julia
+        bk_stderr_fd = ccall(:dup, Int32, (Int32,), STDERR.fd)
+        if bk_stderr_fd == -1
+            println(stderr_stream, "dup: ", strerror())
+            exit(0xff)
+        end
+        bk_stderr_stream = fdio(bk_stderr_fd, true)
+
         # now actually do the fork and exec without writes
         pid = fork()
         if pid == 0
@@ -510,7 +516,7 @@ function spawn(cmd::Cmd)
                 # dup2 manually inlined to avoid potential heap stomping
                 r = ccall(:dup2, Int32, (Int32, Int32), dup2_fds[i], dup2_fds[i+1])
                 if r == -1
-                    println(stderr_stream, "dup2: ", strerror())
+                    println(bk_stderr_stream, "dup2: ", strerror())
                     exit(0xff)
                 end
                 i += 2
@@ -518,10 +524,10 @@ function spawn(cmd::Cmd)
             i = 1
             n = length(dup2_sinks)
             while i <= n
-                #TODO: should save original STDERR for later potential errors
+                # dup2 manually inlined to avoid potential heap stomping
                 r = ccall(:dup2, Int32, (Int32, Int32), dup2_sinks[i], dup2_sinks[i+1])
                 if r == -1
-                    println(stderr_stream, "dup2: ", strerror())
+                    println(bk_stderr_stream, "dup2: ", strerror())
                     exit(0xff)
                 end
                 i += 2
@@ -532,14 +538,14 @@ function spawn(cmd::Cmd)
                 # close manually inlined to avoid potential heap stomping
                 r = ccall(:close, Int32, (Int32,), close_fds[i])
                 if r != 0
-                    println(stderr_stream, "close: ", strerror())
+                    println(bk_stderr_stream, "close: ", strerror())
                     exit(0xff)
                 end
                 i += 1
             end
             if !isequal(ptrs, nothing)
                 ccall(:execvp, Int32, (Ptr{Uint8}, Ptr{Ptr{Uint8}}), ptrs[1], ptrs)
-                println(stderr_stream, "exec: ", strerror())
+                println(bk_stderr_stream, "exec: ", strerror())
                 exit(0xff)
             end
             # other ways of execing (e.g. a julia function)
@@ -548,7 +554,7 @@ function spawn(cmd::Cmd)
             try
                 exec(c)
             catch err
-                show(stderr, err)
+                show(bk_stderr_stream, err)
                 exit(0xff)
             end
             error("exec should not return but has")
