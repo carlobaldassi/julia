@@ -256,7 +256,12 @@ type Port
     fd::FileDes
 end
 
-fd(cmd::Cmd, f::FileDes) = Port(cmd,f)
+function fd(cmd::Cmd, f::FileDes)
+    if !has(cmd.pipes, f) && !has(cmd.sinks, f)
+        return Port(cmd,f)
+    end
+    error("no ", f, " available in ", cmd)
+end
 
 function fd(cmds::Set{Cmd}, f::FileDes)
     set = Set{Port}()
