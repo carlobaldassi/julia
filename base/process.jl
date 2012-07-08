@@ -202,10 +202,31 @@ type StringSink <: Sink
     StringSink(s::String, fd::FileDes) = new(s, fd)
 end
 
+type CmdRedirDirective
+    src_fd::FileDes
+    dst_fd::FileDes
+end
+
+type CmdRedir
+    map::Vector{CmdRedirDirective}
+    CmdRedir() = new(CmdRedirDirective[])
+end
+
+function (>&)(fd1::FileDes, fd2::FileDes)
+    cr = CmdRedir()
+    push(cr.map, CmdRedirDirective(fd1, fd2))
+    return cr
+end
+
+(>&)(fd1::Integer, fd2::Integer) = (FileDes(int32(fd1)) >& FileDes(int32(fd2)))
+
+(*)(cr1::CmdRedir, cr2::CmdRedir) = (cr = CmdRedir(); cr.map = [cr1.map; cr2.map]; return cr)
+
 type Cmd
     exec::Executable
     pipes::Dict{FileDes,PipeEnd}
     sinks::Dict{FileDes,Sink}
+    redirs::CmdRedir
     pipeline::Set{Cmd}
     pid::Int32
     status::ProcessStatus
@@ -218,6 +239,7 @@ type Cmd
         this = new(exec,
                    Dict{FileDes,PipeEnd}(),
                    Dict{FileDes,Sink}(),
+                   CmdRedir(),
                    Set{Cmd}(),
                    0,
                    ProcessNotRun(),
@@ -487,6 +509,13 @@ end
 
 (<<<)(dst::Cmds, src::String) = (>>>)(src, dst)
 
+function (*)(cmd::Cmd, cr::CmdRedir)
+    cmd.redirs = cr
+    return cmd
+end
+
+(*)(cr::CmdRedir, cmd::Cmd) = (*)(cmd, cr)
+
 
 # spawn(cmd) starts all processes connected to cmd
 
@@ -521,6 +550,7 @@ function spawn(cmd::Cmd)
         dup2_sinks = Array(Int32, 2*numel(c.sinks))
         str_sinks = String[]
         str_sinks_fds = Int32[]
+        dup2_redirs = Array(Int32, 2*numel(c.redirs.map))
         close_fds_ = copy(fds)
         i = 0
         for (f,p) in c.pipes
@@ -537,6 +567,11 @@ function spawn(cmd::Cmd)
                 del(close_fds_, s.fd)
             end
             dup2_sinks[i+=1] = f.fd
+        end
+        i = 0
+        for rd in c.redirs.map
+            dup2_redirs[i+=1] = rd.dst_fd.fd
+            dup2_redirs[i+=1] = rd.src_fd.fd
         end
         close_fds = Array(Int32, numel(close_fds_))
         i = 0
@@ -588,6 +623,17 @@ function spawn(cmd::Cmd)
                         exit(0xff)
                     end
                     j += 1
+                end
+                i += 2
+            end
+            i = 1
+            n = length(dup2_redirs)
+            while i <= n
+                # dup2 manually inlined to avoid potential heap stomping
+                r = ccall(:dup2, Int32, (Int32, Int32), dup2_redirs[i], dup2_redirs[i+1])
+                if r == -1
+                    println(bk_stderr_stream, "dup2: ", strerror())
+                    exit(0xff)
                 end
                 i += 2
             end
