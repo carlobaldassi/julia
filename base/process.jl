@@ -172,14 +172,14 @@ function close_sink(sink::FileSink)
     end
 end
 
+fd(sink::FileSink) = fd(sink.s)
+
 type Cmd
     exec::Executable
     pipes::Dict{FileDes,PipeEnd}
+    sinks::Dict{FileDes,FileSink}
     pipeline::Set{Cmd}
     pid::Int32
-    in_sink::FileSink
-    out_sink::FileSink
-    err_sink::FileSink
     status::ProcessStatus
     successful::Function
 
@@ -189,11 +189,9 @@ type Cmd
         end
         this = new(exec,
                    Dict{FileDes,PipeEnd}(),
+                   Dict{FileDes,FileSink}(),
                    Set{Cmd}(),
                    0,
-                   FileSink(stdin_stream, false),
-                   FileSink(stdout_stream, false),
-                   FileSink(stderr_stream, false),
                    ProcessNotRun(),
                    default_success)
         add(this.pipeline, this)
@@ -229,9 +227,9 @@ end
 exec(cmd::Cmd) = exec(cmd.exec)
 
 function close_sinks(cmd::Cmd)
-    close_sink(cmd.in_sink)
-    close_sink(cmd.out_sink)
-    close_sink(cmd.err_sink)
+    for (f,s) in cmd.sinks
+        close_sink(s)
+    end
 end
 
 ## Port: a file descriptor on a particular command ##
@@ -246,7 +244,7 @@ fd(cmd::Cmd, f::FileDes) = Port(cmd,f)
 function fd(cmds::Set{Cmd}, f::FileDes)
     set = Set{Port}()
     for cmd in cmds
-        if !has(cmd.pipes, f)
+        if !has(cmd.pipes, f) && !has(cmd.sinks, f)
             add(set, fd(cmd,f))
         end
     end
@@ -362,37 +360,23 @@ end
 (|)(src::Ports, dst::Cmds) = (src | stdin(dst); dst)
 (|)(src::Cmds,  dst::Cmds) = (stdout(src) | stdin(dst); src & dst)
 
-redir_out(port::Port, s::IOStream, own::Bool) = (port.cmd.out_sink = FileSink(s, own))
-function redir_out(ports::Ports, s::IOStream, own::Bool)
+redir(port::Port, s::IOStream, own::Bool) = port.cmd.sinks[port.fd] = FileSink(s, own)
+function redir(ports::Ports, s::IOStream, own::Bool)
     for port in ports
-        redir_out(port, s, own)
-    end
-end
-
-redir_in(port::Port, s::IOStream, own::Bool) = (port.cmd.in_sink = FileSink(s, own))
-function redir_in(ports::Ports, s::IOStream, own::Bool)
-    for port in ports
-        redir_in(port, s, own)
-    end
-end
-
-redir_err(port::Port, s::IOStream, own::Bool) = (port.cmd.err_sink = FileSink(s, own))
-function redir_err(ports::Ports, s::IOStream, own::Bool)
-    for port in ports
-        redir_err(port, s, own)
+        redir(port, s, own)
     end
 end
 
 function (>)(src::String, dest::Cmds)
     f = open(src, "r")
-    redir_in(stdin(dest), f, true)
+    redir(stdin(dest), f, true)
     return dest
 end
 
 (<)(dest::Cmds, src::String) = (>)(src, dest)
 
 function (>)(src::IOStream, dest::Cmds)
-    redir_in(stdin(dest), src, false)
+    redir(stdin(dest), src, false)
     return dest
 end
 
@@ -400,13 +384,13 @@ end
 
 function (>)(src::Cmds, dst::String)
     f = open(dst, "w")
-    redir_out(stdout(src), f, true)
+    redir(stdout(src), f, true)
     return src
 end
 
 function (>>)(src::Cmds, dst::String)
     f = open(dst, "a")
-    redir_out(stdout(src), f, true)
+    redir(stdout(src), f, true)
     return src
 end
 
@@ -414,7 +398,7 @@ end
 (<<)(dest::String, src::Cmds) = (>>)(src, dest)
 
 function (>)(src::Cmds, dst::IOStream)
-    redir_out(stdout(src), dst, false)
+    redir(stdout(src), dst, false)
     return src
 end
 
@@ -424,13 +408,13 @@ end
 
 function (.>)(src::Cmds, dst::String)
     f = open(dst, "w")
-    redir_err(stderr(src), f, true)
+    redir(stderr(src), f, true)
     return src
 end
 
 function (.>>)(src::Cmds, dst::String)
     f = open(dst, "a")
-    redir_err(stderr(src), f, true)
+    redir(stderr(src), f, true)
     return src
 end
 
@@ -438,13 +422,22 @@ end
 (.<<)(dest::String, src::Cmds) = (>>)(src, dest)
 
 function (.>)(src::Cmds, dst::IOStream)
-    redir_err(stderr(src), dst, false)
+    redir(stderr(src), dst, false)
     return src
 end
 
 (.>>)(src::Cmds, dst::IOStream) = (.>)(src, dst)
 (.<)(dest::IOStream, src::Cmds) = (.>)(src, dest)
 (.<<)(dest::IOStream, src::Cmds) = (.>>)(src, dest)
+
+#TODO: here-strings
+#function (>>>)(src::String, dest::Cmds)
+    #f = open(src, "r")
+    #redir(stdin(dest), f, true)
+    #return dest
+#end
+#
+#(<<<)(dest::Cmds, src::String) = (>)(src, dest)
 
 
 
@@ -474,12 +467,18 @@ function spawn(cmd::Cmd)
         c.status = ProcessRunning()
         ptrs = isa(c.exec,Vector{ByteString}) ? _jl_pre_exec(c.exec) : nothing
         dup2_fds = Array(Int32, 2*numel(c.pipes))
+        dup2_sinks = Array(Int32, 2*numel(c.sinks))
         close_fds_ = copy(fds)
         i = 0
         for (f,p) in c.pipes
             dup2_fds[i+=1] = fd(p).fd
             dup2_fds[i+=1] = f.fd
             del(close_fds_, fd(p))
+        end
+        i = 0
+        for (f,s) in c.sinks
+            dup2_sinks[i+=1] = fd(s)
+            dup2_sinks[i+=1] = f.fd
         end
         close_fds = Array(Int32, numel(close_fds_))
         i = 0
@@ -500,27 +499,16 @@ function spawn(cmd::Cmd)
                 end
                 i += 2
             end
-            if !is(c.in_sink.s, stdin_stream)
-                r = ccall(:dup2, Int32, (Int32, Int32), fd(c.in_sink.s), STDIN.fd)
-                if r == -1
-                    println(stderr_stream, "dup2: ", strerror())
-                    exit(0xff)
-                end
-            end
-            if !is(c.out_sink.s, stdout_stream)
-                r = ccall(:dup2, Int32, (Int32, Int32), fd(c.out_sink.s), STDOUT.fd)
-                if r == -1
-                    println(stderr_stream, "dup2: ", strerror())
-                    exit(0xff)
-                end
-            end
-            if !is(c.err_sink.s, stderr_stream)
+            i = 1
+            n = length(dup2_sinks)
+            while i <= n
                 #TODO: should save original STDERR for later potential errors
-                r = ccall(:dup2, Int32, (Int32, Int32), fd(c.err_sink.s), STDERR.fd)
+                r = ccall(:dup2, Int32, (Int32, Int32), dup2_sinks[i], dup2_sinks[i+1])
                 if r == -1
                     println(stderr_stream, "dup2: ", strerror())
                     exit(0xff)
                 end
+                i += 2
             end
             i = 1
             n = length(close_fds)
