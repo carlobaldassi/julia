@@ -164,6 +164,23 @@ end
 type FileSink
     s::IOStream
     own::Bool
+    function FileSink(s::IOStream, own::Bool)
+        if fd(s) == -1
+            error("Cannot use the given IOStream as FileSink")
+        end
+        this = new(s, own)
+        if own
+            finalizer(this, close_sink)
+        end
+        return this
+    end
+end
+
+FileSink(s::IOStream) = FileSink(s, false)
+
+function FileSink(filename::String, args...)
+    s = open(filename, args...)
+    return FileSink(s, true)
 end
 
 function close_sink(sink::FileSink)
@@ -360,37 +377,34 @@ end
 (|)(src::Ports, dst::Cmds) = (src | stdin(dst); dst)
 (|)(src::Cmds,  dst::Cmds) = (stdout(src) | stdin(dst); src & dst)
 
-redir(port::Port, s::IOStream, own::Bool) = port.cmd.sinks[port.fd] = FileSink(s, own)
-function redir(ports::Ports, s::IOStream, own::Bool)
+redir(port::Port, sink::FileSink) = port.cmd.sinks[port.fd] = sink
+function redir(ports::Ports, sink::FileSink)
     for port in ports
-        redir(port, s, own)
+        redir(port, sink)
     end
 end
 
 function (>)(src::String, dest::Cmds)
-    f = open(src, "r")
-    redir(stdin(dest), f, true)
+    redir(stdin(dest), FileSink(src, "r"))
     return dest
 end
 
 (<)(dest::Cmds, src::String) = (>)(src, dest)
 
 function (>)(src::IOStream, dest::Cmds)
-    redir(stdin(dest), src, false)
+    redir(stdin(dest), FileSink(src))
     return dest
 end
 
 (<)(dest::Cmds, src::IOStream) = (>)(src, dest)
 
 function (>)(src::Cmds, dst::String)
-    f = open(dst, "w")
-    redir(stdout(src), f, true)
+    redir(stdout(src), FileSink(dst, "w"))
     return src
 end
 
 function (>>)(src::Cmds, dst::String)
-    f = open(dst, "a")
-    redir(stdout(src), f, true)
+    redir(stdout(src), FileSink(dst, "a"))
     return src
 end
 
@@ -398,7 +412,7 @@ end
 (<<)(dest::String, src::Cmds) = (>>)(src, dest)
 
 function (>)(src::Cmds, dst::IOStream)
-    redir(stdout(src), dst, false)
+    redir(stdout(src), FileSink(dst))
     return src
 end
 
@@ -407,14 +421,12 @@ end
 (<<)(dest::IOStream, src::Cmds) = (>>)(src, dest)
 
 function (.>)(src::Cmds, dst::String)
-    f = open(dst, "w")
-    redir(stderr(src), f, true)
+    redir(stderr(src), FileSink(dst, "w"))
     return src
 end
 
 function (.>>)(src::Cmds, dst::String)
-    f = open(dst, "a")
-    redir(stderr(src), f, true)
+    redir(stderr(src), FileSink(dst, "a"))
     return src
 end
 
@@ -422,7 +434,7 @@ end
 (.<<)(dest::String, src::Cmds) = (>>)(src, dest)
 
 function (.>)(src::Cmds, dst::IOStream)
-    redir(stderr(src), dst, false)
+    redir(stderr(src), FileSink(dst))
     return src
 end
 
@@ -432,8 +444,7 @@ end
 
 #TODO: here-strings
 #function (>>>)(src::String, dest::Cmds)
-    #f = open(src, "r")
-    #redir(stdin(dest), f, true)
+    #redir(stdin(dest), FileSink(src, "r"))
     #return dest
 #end
 #
