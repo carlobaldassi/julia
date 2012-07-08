@@ -161,7 +161,12 @@ function exec(thunk::Function)
     exit(0)
 end
 
-type FileSink
+abstract Sink
+
+close_sink(sink::Sink) = nothing
+fd(sink::Sink) = -1
+
+type FileSink <: Sink
     s::IOStream
     own::Bool
     function FileSink(s::IOStream, own::Bool)
@@ -191,10 +196,16 @@ end
 
 fd(sink::FileSink) = fd(sink.s)
 
+type StringSink <: Sink
+    s::ASCIIString
+    fd::FileDes
+    StringSink(s::String, fd::FileDes) = new(s, fd)
+end
+
 type Cmd
     exec::Executable
     pipes::Dict{FileDes,PipeEnd}
-    sinks::Dict{FileDes,FileSink}
+    sinks::Dict{FileDes,Sink}
     pipeline::Set{Cmd}
     pid::Int32
     status::ProcessStatus
@@ -206,7 +217,7 @@ type Cmd
         end
         this = new(exec,
                    Dict{FileDes,PipeEnd}(),
-                   Dict{FileDes,FileSink}(),
+                   Dict{FileDes,Sink}(),
                    Set{Cmd}(),
                    0,
                    ProcessNotRun(),
@@ -385,8 +396,8 @@ end
 (|)(src::Ports, dst::Cmds) = (src | stdin(dst); dst)
 (|)(src::Cmds,  dst::Cmds) = (stdout(src) | stdin(dst); src & dst)
 
-redir(port::Port, sink::FileSink) = port.cmd.sinks[port.fd] = sink
-function redir(ports::Ports, sink::FileSink)
+redir(port::Port, sink::Sink) = port.cmd.sinks[port.fd] = sink
+function redir(ports::Ports, sink::Sink)
     for port in ports
         redir(port, sink)
     end
@@ -446,15 +457,35 @@ end
 
 (.<)(dst::IOStream, src::Cmds) = (.>)(src, dst)
 
-#TODO: here-strings
-#function (>>>)(src::String, dst::Cmds)
-    #redir(stdin(dst), FileSink(src, "r"))
-    #return dst
-#end
-#
-#(<<<)(dst::Cmds, src::String) = (>>>)(src, dst)
+function (&>)(src::Cmds, dst::String)
+    redir(output(src), FileSink(dst, "w"))
+    return src
+end
 
+function (&>>)(src::Cmds, dst::String)
+    redir(output(src), FileSink(dst, "a"))
+    return src
+end
 
+(&<)(dst::String, src::Cmds) = (&>)(src, dst)
+(&<<)(dst::String, src::Cmds) = (&>>)(src, dst)
+
+function (&>)(src::Cmds, dst::IOStream)
+    redir(output(src), FileSink(dst))
+    return src
+end
+
+(&<)(dst::IOStream, src::Cmds) = (&>)(src, dst)
+
+# here-strings:
+function (>>>)(src::String, dst::Cmds)
+    in_ports = stdin(dst)
+    in_fd = write_to(in_ports)
+    redir(in_ports, StringSink(src, in_fd))
+    return dst
+end
+
+(<<<)(dst::Cmds, src::String) = (>>>)(src, dst)
 
 
 # spawn(cmd) starts all processes connected to cmd
@@ -475,6 +506,11 @@ function spawn(cmd::Cmd)
             add(fds, other(p))
             add(fds_, fd(p))
         end
+        for (f,s) in c.sinks
+            if isa(s, StringSink)
+                add(fds_, s.fd)
+            end
+        end
     end
     gc_disable()
     for c = cmd.pipeline
@@ -483,6 +519,8 @@ function spawn(cmd::Cmd)
         ptrs = isa(c.exec,Vector{ByteString}) ? _jl_pre_exec(c.exec) : nothing
         dup2_fds = Array(Int32, 2*numel(c.pipes))
         dup2_sinks = Array(Int32, 2*numel(c.sinks))
+        str_sinks = String[]
+        str_sinks_fds = Int32[]
         close_fds_ = copy(fds)
         i = 0
         for (f,p) in c.pipes
@@ -493,6 +531,11 @@ function spawn(cmd::Cmd)
         i = 0
         for (f,s) in c.sinks
             dup2_sinks[i+=1] = fd(s)
+            if dup2_sinks[i] == -1
+                push(str_sinks, s.s)
+                push(str_sinks_fds, s.fd.fd)
+                del(close_fds_, s.fd)
+            end
             dup2_sinks[i+=1] = f.fd
         end
         close_fds = Array(Int32, numel(close_fds_))
@@ -508,7 +551,7 @@ function spawn(cmd::Cmd)
             println(stderr_stream, "dup: ", strerror())
             exit(0xff)
         end
-        bk_stderr_stream = fdio(bk_stderr_fd, true)
+        bk_stderr_stream = fdio(bk_stderr_fd)
 
         # now actually do the fork and exec without writes
         pid = fork()
@@ -525,13 +568,26 @@ function spawn(cmd::Cmd)
                 i += 2
             end
             i = 1
+            j = 1
             n = length(dup2_sinks)
             while i <= n
-                # dup2 manually inlined to avoid potential heap stomping
-                r = ccall(:dup2, Int32, (Int32, Int32), dup2_sinks[i], dup2_sinks[i+1])
-                if r == -1
-                    println(bk_stderr_stream, "dup2: ", strerror())
-                    exit(0xff)
+                if dup2_sinks[i] != -1
+                    # dup2 manually inlined to avoid potential heap stomping
+                    r = ccall(:dup2, Int32, (Int32, Int32), dup2_sinks[i], dup2_sinks[i+1])
+                    if r == -1
+                        println(bk_stderr_stream, "dup2: ", strerror())
+                        exit(0xff)
+                    end
+                else
+                    d = fdio(str_sinks_fds[j])
+                    write(d, str_sinks[j])
+                    close(d)
+                    r = ccall(:close, Int32, (Int32,), str_sinks_fds[j])
+                    if r != 0
+                        println(bk_stderr_stream, "close: ", strerror())
+                        exit(0xff)
+                    end
+                    j += 1
                 end
                 i += 2
             end
