@@ -320,11 +320,14 @@ end
 output(cmds::Cmds) = stdout(cmds) & stderr(cmds)
 
 function connect(port::Port, pend::PipeEnd)
-    if !has(port.cmd.pipes, port.fd)
+    if !has(port.cmd.pipes, port.fd) && !has(port.cmd.sinks, port.fd)
         port.cmd.pipes[port.fd] = pend
-    elseif port.cmd.pipes[port.fd] != pend
+    elseif has(port.cmd.pipes, port.fd) && port.cmd.pipes[port.fd] != pend
         error(port.cmd, " is already connected to ",
               fd(port.cmd.pipes[port.fd]))
+    elseif has(port.cmd.sinks, port.fd)
+        error(port.cmd, " is already connected to ",
+              fd(port.cmd.sinks[port.fd]))
     end
     return pend
 end
