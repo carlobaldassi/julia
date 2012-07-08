@@ -384,19 +384,19 @@ function redir(ports::Ports, sink::FileSink)
     end
 end
 
-function (>)(src::String, dest::Cmds)
-    redir(stdin(dest), FileSink(src, "r"))
-    return dest
+function (>)(src::String, dst::Cmds)
+    redir(stdin(dst), FileSink(src, "r"))
+    return dst
 end
 
-(<)(dest::Cmds, src::String) = (>)(src, dest)
+(<)(dst::Cmds, src::String) = (>)(src, dst)
 
-function (>)(src::IOStream, dest::Cmds)
-    redir(stdin(dest), FileSink(src))
-    return dest
+function (>)(src::IOStream, dst::Cmds)
+    redir(stdin(dst), FileSink(src))
+    return dst
 end
 
-(<)(dest::Cmds, src::IOStream) = (>)(src, dest)
+(<)(dst::Cmds, src::IOStream) = (>)(src, dst)
 
 function (>)(src::Cmds, dst::String)
     redir(stdout(src), FileSink(dst, "w"))
@@ -408,8 +408,8 @@ function (>>)(src::Cmds, dst::String)
     return src
 end
 
-(<)(dest::String, src::Cmds) = (>)(src, dest)
-(<<)(dest::String, src::Cmds) = (>>)(src, dest)
+(<)(dst::String, src::Cmds) = (>)(src, dst)
+(<<)(dst::String, src::Cmds) = (>>)(src, dst)
 
 function (>)(src::Cmds, dst::IOStream)
     redir(stdout(src), FileSink(dst))
@@ -417,8 +417,8 @@ function (>)(src::Cmds, dst::IOStream)
 end
 
 (>>)(src::Cmds, dst::IOStream) = (>)(src, dst)
-(<)(dest::IOStream, src::Cmds) = (>)(src, dest)
-(<<)(dest::IOStream, src::Cmds) = (>>)(src, dest)
+(<)(dst::IOStream, src::Cmds) = (>)(src, dst)
+(<<)(dst::IOStream, src::Cmds) = (>>)(src, dst)
 
 function (.>)(src::Cmds, dst::String)
     redir(stderr(src), FileSink(dst, "w"))
@@ -430,8 +430,8 @@ function (.>>)(src::Cmds, dst::String)
     return src
 end
 
-(.<)(dest::String, src::Cmds) = (>)(src, dest)
-(.<<)(dest::String, src::Cmds) = (>>)(src, dest)
+(.<)(dst::String, src::Cmds) = (.>)(src, dst)
+(.<<)(dst::String, src::Cmds) = (.>>)(src, dst)
 
 function (.>)(src::Cmds, dst::IOStream)
     redir(stderr(src), FileSink(dst))
@@ -439,16 +439,16 @@ function (.>)(src::Cmds, dst::IOStream)
 end
 
 (.>>)(src::Cmds, dst::IOStream) = (.>)(src, dst)
-(.<)(dest::IOStream, src::Cmds) = (.>)(src, dest)
-(.<<)(dest::IOStream, src::Cmds) = (.>>)(src, dest)
+(.<)(dst::IOStream, src::Cmds) = (.>)(src, dst)
+(.<<)(dst::IOStream, src::Cmds) = (.>>)(src, dst)
 
 #TODO: here-strings
-#function (>>>)(src::String, dest::Cmds)
-    #redir(stdin(dest), FileSink(src, "r"))
-    #return dest
+#function (>>>)(src::String, dst::Cmds)
+    #redir(stdin(dst), FileSink(src, "r"))
+    #return dst
 #end
 #
-#(<<<)(dest::Cmds, src::String) = (>)(src, dest)
+#(<<<)(dst::Cmds, src::String) = (>>>)(src, dst)
 
 
 
