@@ -563,6 +563,7 @@ function spawn(cmd::Cmd)
             error("exec should not return but has")
         end
         c.pid = pid
+        close(bk_stderr_stream) # do it manually since gc is disabled
     end
     for f in fds_
         close(f)
