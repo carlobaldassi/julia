@@ -1131,13 +1131,9 @@ function _err_arg_outofrange(name::String, a, is_opt::Bool)
                    " $name: $a")
 end
 
-# XXX weird bug
-#function _parse1_optarg(f::ArgParserField, rest, args_list, name::String,
-#                        is_opt::Bool, arg_delim_found::Bool,
-#                        out_dict::Dict, last_ind::Int) # actual line
 function _parse1_optarg(f::ArgParserField, rest, args_list, name::String,
                         is_opt::Bool, arg_delim_found::Bool,
-                        out_dict::Dict, last_ind::Int, result) # workaround
+                        out_dict::Dict, last_ind::Int)
     arg_consumed = false
     if is_multi_nargs(f.nargs)
         opt_arg = Array(f.arg_type, 0)
@@ -1266,8 +1262,7 @@ function _parse1_optarg(f::ArgParserField, rest, args_list, name::String,
     else
         _found_a_bug()
     end
-    #return out_dict, last_ind, arg_consumed # XXX actual line
-    result[1] = out_dict; result[2] = last_ind; result[3] = arg_consumed; # workaround
+    return out_dict, last_ind, arg_consumed
 end
 #}}}
 
@@ -1307,16 +1302,9 @@ function _parse_long_opt(arg_parser::ArgumentParser, opt_name::String, last_ind:
     if is_flag(f)
         out_dict = _parse1_flag(arg_parser, f, !(arg_after_eq === nothing), "--"*opt_name, out_dict)
     else
-        # XXX weird bug (actually fine here, the bug shows up in _parse_short_opt)
-        #out_dict, last_ind, arg_consumed =
-        #        _parse1_optarg(f, arg_after_eq, args_list, "--"*opt_name,
-        #                       true, false,
-        #                       out_dict, last_ind) # actual line
-        result = Array(Any, 3) # workaround
-        _parse1_optarg(f, arg_after_eq, args_list, "--"*opt_name,
-                       true, false,
-                       out_dict, last_ind, result) # workaround
-        out_dict = result[1]; last_ind = result[2]; arg_consumed = result[3]; # workaround
+        out_dict, last_ind, arg_consumed =
+                _parse1_optarg(f, arg_after_eq, args_list, "--"*opt_name,
+                               true, false, out_dict, last_ind)
     end
     return last_ind, out_dict
 end
@@ -1365,15 +1353,9 @@ function _parse_short_opt(arg_parser::ArgumentParser, shopts_lst::String, last_i
             out_dict = _parse1_flag(arg_parser, f, next_is_eq, "-"*opt_name, out_dict)
         else
             # XXX weird bug
-            #out_dict, last_ind, arg_consumed =
-            #        _parse1_optarg(f, rest_as_arg, args_list, "-"*opt_name,
-            #                       true, false,
-            #                       out_dict, last_ind) # actual line
-            result = Array(Any, 3) # workaround
-            _parse1_optarg(f, rest_as_arg, args_list, "-"*opt_name,
-                           true, false,
-                           out_dict, last_ind, result) # workaround
-            out_dict = result[1]; last_ind = result[2]; arg_consumed = result[3]; # workaround
+            out_dict, last_ind, arg_consumed =
+                    _parse1_optarg(f, rest_as_arg, args_list, "-"*opt_name,
+                                   true, false, out_dict, last_ind)
         end
         if arg_consumed
             break
@@ -1400,16 +1382,9 @@ function _parse_arg(arg_parser::ArgumentParser, last_ind::Int, last_arg::Int, ar
     end
     f = arg_parser.args[new_arg_ind]
 
-    # XXX weird bug (the bug shows up in _parse_short_opt)
-    #out_dict, last_ind, arg_consumed =
-    #        _parse1_optarg(f, nothing, args_list, f.dest_name,
-    #                       false, arg_delim_found,
-    #                       out_dict, last_ind-1) # actual line
-    result = Array(Any, 3) # workaround
-    _parse1_optarg(f, nothing, args_list, f.metavar,
-                   false, arg_delim_found,
-                   out_dict, last_ind-1, result) # workaround
-    out_dict = result[1]; last_ind = result[2]; arg_consumed = result[3]; # workaround
+    out_dict, last_ind, arg_consumed =
+            _parse1_optarg(f, nothing, args_list, f.dest_name,
+                           false, arg_delim_found, out_dict, last_ind-1)
 
     return last_ind, new_arg_ind, out_dict
 end
