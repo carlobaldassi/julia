@@ -25,10 +25,28 @@ $(function() {
   var sidebar = $('.sphinxsidebar');
   var sidebarview = $('.sphinxsidebarview');
   var sidebarcontent = $('.sphinxsidebarcontent');
+  var sidebarscrollerwrapper = $('.sphinxsidebarscrollerwrapper');
+  var sidebarscroller = $('.sphinxsidebarscroller');
   var sidebarbuttondiv = $('.sphinxsidebarbutton');
   var sidebarbutton = $('#sidebarbutton');
 
   var uncollapsed_height = 0;
+
+  var sidebarscroll_startY = 0;
+  var sidebarscroll_start_scroll = 0;
+  var sidebarscroller_rate = 1;
+
+  body.prepend('<p id="printf">TEST</p>');
+  var printf = $('#printf');
+  printf.css({
+      'position': 'fixed',
+      'top': 10,
+      'left': 400,
+      'border-width': 2,
+      'border-style': 'solid',
+      'background-color': 'red'
+  });
+  var pfcntr = 0;
 
   // if for some reason the document has no sidebar, do not run into errors
   if (!sidebar.length) return;
@@ -83,13 +101,66 @@ $(function() {
     return Math.min(uncollapsed_height, $(window).height() - barpad - bartop);
   }
 
+  function get_scroller_height() {
+    var bartop = viewOffsetTop(sidebar);
+    var barheight = sidebarbuttondiv.height();
+    //var buttonheight = sidebarbutton.height();
+    var barscroll = sidebarview.scrollTop();
+
+    var visibleheight = Math.min(barheight, $(window).height() - barpad - bartop);
+    printf.text("bar_h=" + visibleheight +
+                " uncoll_h=" + barheight +
+                " frac=" + visibleheight / barheight +
+                " result=" + visibleheight * visibleheight / barheight +
+                " cntr=" + pfcntr
+                );
+    pfcntr += 1;
+    return visibleheight * visibleheight / barheight;
+  }
+
   function set_button_margin() {
     var bartop = viewOffsetTop(sidebar);
     var barheight = sidebarbuttondiv.height();
     var buttonheight = sidebarbutton.height();
     var buttonscroll = sidebarview.scrollTop();
+    //printf.text("buttonscroll=" + buttonscroll);
     var newmargin = (Math.min(barheight, $(window).height() - barpad - bartop) - buttonheight) / 2 + buttonscroll;
     sidebarbutton.css('margin-top', newmargin);
+  }
+
+  function set_scroller_pos() {
+    var bartop = viewOffsetTop(sidebar);
+    var barheight = sidebarbuttondiv.height();
+
+    var visibleheight = Math.min(barheight, $(window).height() - barpad - bartop);
+    //printf.text("bar_h=" + visibleheight +
+                //" uncoll_h=" + barheight +
+                //" frac=" + visibleheight / barheight +
+                //" result=" + visibleheight * visibleheight / barheight +
+                //" cntr=" + pfcntr
+                //);
+    //pfcntr += 1;
+    sidebarscroller_rate = visibleheight / barheight;
+    var scroller_height = visibleheight * sidebarscroller_rate;
+
+    //var bartop = viewOffsetTop(sidebar);
+    //var barheight = sidebar.height();
+    //var barscroll = sidebarview.scrollTop();
+    ////var newmargin = barscroll - scroller_height / 2;
+    //var newmargin = (Math.min(barheight, $(window).height() - barpad - bartop) - scroller_height) / 2 + barscroll;
+    //printf.text("barscroll=" + barscroll + " barheight=" + barheight + " newmargin=" + newmargin +
+                //" scroller_height=" + scroller_height);
+    var barscroll = sidebarview.scrollTop();
+    var add_scroll = barscroll * sidebarscroller_rate;
+    //printf.text("barscroll=" + barscroll +
+                //" add_scroll=" + add_scroll +
+                //" cntr=" + pfcntr
+                //);
+    //pfcntr += 1;
+    sidebarscroller.css({
+      'height': scroller_height,
+      'margin-top': barscroll + add_scroll
+    });
   }
 
   function collapse_sidebar() {
@@ -99,6 +170,7 @@ $(function() {
     var newheight = get_collapsed_height();
 
     sidebarcontent.hide();
+    sidebarscrollerwrapper.hide();
     sidebar.css('width', ssb_width_collapsed);
     var newmargins = {
       'margin-left': bw_margin_collapsed,
@@ -125,6 +197,7 @@ $(function() {
     footerwrapper.css(newmargins);
     sidebar.css('width', ssb_width_expanded);
     sidebarcontent.show();
+    sidebarscrollerwrapper.show();
     sidebarbuttondiv.css({
       'height': '',
       'border-radius': '0 5px 5px 0'
@@ -134,6 +207,7 @@ $(function() {
     sidebarview.css('height', sidebar.height());
     sidebar.css('width', sidebarview[0].scrollWidth);
     set_button_margin();
+    set_scroller_pos();
     sidebarview.scrollTop(barscroll);
     document.cookie = 'sidebar=expanded';
   }
@@ -166,11 +240,60 @@ $(function() {
     sidebarview.css('height', sidebar.height());
     if (!sidebar_is_collapsed()) {
       sidebar.css('width', sidebarview[0].scrollWidth);
+      set_scroller_pos();
     } else {
       var newheight = get_collapsed_height();
       sidebarbuttondiv.css('height', newheight);
     }
     set_button_margin();
+  }
+
+  function initiate_sidebarscroll(e) {
+    if (e.which != 1) {
+      return;
+    }
+    sidebarscroll_startY = e.clientY;
+    sidebarscroll_start_scroll = sidebarview.scrollTop();
+    document.body.focus();
+    //document.body.style.cursor = "move";
+    //$('body').addClass('moving');
+    sidebarcontent.css('cursor', 'move');
+    printf.text("mousedown startY=" + sidebarscroll_startY +
+                " start_scroll=" + sidebarscroll_start_scroll);
+    document.onmouseup = end_sidebarscroll;
+    document.onmousemove = do_sidebarscroll;
+
+    // prevent text selection in IE
+    document.onselectstart = function () { return false; };
+    // prevent IE from trying to drag an image
+    //e.srcElement.ondragstart = function() { return false; };
+
+    // prevent text selection (except IE)
+    return false;
+  }
+
+  function do_sidebarscroll(e) {
+    var sidebarscroll_Y = e.clientY;
+    //var scrollby = (sidebarscroll_Y - sidebarscroll_startY) / sidebarscroller_rate; // scrollbar version
+    var scrollby = sidebarscroll_startY - sidebarscroll_Y;
+    var newscroll = sidebarscroll_start_scroll + scrollby;
+
+    sidebarview.scrollTop(newscroll);
+
+    printf.text("mousedown startY=" + sidebarscroll_startY +
+                " currentY=" + sidebarscroll_Y +
+                " oldscroll=" + sidebarscroll_start_scroll + 
+                " scrollby=" + scrollby
+                );
+  }
+
+  function end_sidebarscroll() {
+    printf.text("mouseup");
+    //document.body.style.cursor = 'auto';
+    //$('body').removeClass('moving');
+    sidebarcontent.css('cursor', 'auto');
+    document.onmousemove = null;
+    document.onmouseup = null;
   }
 
   prepare_sidebar_button();
@@ -180,7 +303,12 @@ $(function() {
   set_state_from_cookie();
   compute_uncollapsed_height();
   set_sidebar_pos();
+
   $(window).scroll(set_sidebar_pos);
   sidebarview.scroll(set_button_margin);
+  sidebarview.scroll(set_scroller_pos);
   $(window).resize(set_sidebar_pos);
+
+  //sidebarscroller.mousedown(window.event, initiate_sidebarscroll);
+  sidebarcontent.mousedown(window.event, initiate_sidebarscroll);
 });
