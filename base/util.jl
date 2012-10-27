@@ -217,7 +217,7 @@ end
 begin
 local in_load = false
 local in_remote_load = false
-local load_dict = {}
+local load_dict = Any[]
 global load_now, remote_load
 
 load_now(fname::String) = load_now(bytestring(fname))
@@ -251,7 +251,7 @@ function load_now(fname::ByteString)
         catch e
             iserr, err = true, e
         end
-        load_dict = {}
+        load_dict = Any[]
         in_load = false
         if iserr throw(err); end
     end
@@ -284,17 +284,17 @@ function _jl_init_help()
     if _jl_help_category_dict == nothing
         println("Loading help data...")
         helpdb = evalfile("$JULIA_HOME/../lib/julia/helpdb.jl")
-        _jl_help_category_list = {}
+        _jl_help_category_list = Any[]
         _jl_help_category_dict = Dict()
         _jl_help_function_dict = Dict()
         for (cat,func,desc) in helpdb
             if !has(_jl_help_category_dict, cat)
                 push(_jl_help_category_list, cat)
-                _jl_help_category_dict[cat] = {}
+                _jl_help_category_dict[cat] = Any[]
             end
             push(_jl_help_category_dict[cat], func)
             if !has(_jl_help_function_dict, func)
-                _jl_help_function_dict[func] = {}
+                _jl_help_function_dict[func] = Any[]
             end
             push(_jl_help_function_dict[func], desc)
         end

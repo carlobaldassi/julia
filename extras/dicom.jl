@@ -1,4 +1,4 @@
-include("dcm_dict.jl")
+include("extras/dcm_dict.jl")
 
 function dcm_init()
     dcm_dict = Dict()
@@ -97,7 +97,7 @@ function undefined_length(st, vr)
 end
 
 function sequence_item(st, evr, sz)
-    item = {}
+    item = Any[]
     while true
         elt = element(st, evr)
         if isequal(elt.tag, (0xFFFE,0xE00D))
@@ -116,7 +116,7 @@ function sequence_item_write(st, evr, item)
 end
 
 function sequence_parse(st, evr, sz)
-    sq = {}
+    sq = Any[]
     while sz > 0
         grp = read(st, Uint16)
         elt = read(st, Uint16)
@@ -173,7 +173,7 @@ function pixeldata_parse(st, sz, vr, dcm)
         read(st, data)
     else
         # start with Basic Offset Table Item
-        data = {element(st, false)}
+        data = Any[element(st, false)]
         while true
             grp = read(st, Uint16)
             elt = read(st, Uint16)
@@ -221,7 +221,7 @@ end
 
 function string_parse(st, sz, maxlen, spaces)
     endpos = position(st)+sz
-    data = {""}
+    data = Any[""]
     first = true
     while position(st) < endpos
         c = !first||spaces ? read(st,Char) : skip_spaces(st)
@@ -239,7 +239,7 @@ function string_parse(st, sz, maxlen, spaces)
     return data
 end
 
-numeric_parse(st, T, sz) = { read(st, T) | i=1:div(sz,sizeof(T)) }
+numeric_parse(st, T, sz) = Any[ read(st, T) for i=1:div(sz,sizeof(T)) ]
 
 element(st, evr) = element(st, evr, false)
 function element(st, evr, dcm)
@@ -273,7 +273,7 @@ function element(st, evr, dcm)
     data =
     vr=="ST" || vr=="LT" || vr=="UT" ? bytestring(read(st, Uint8, sz)) :
     
-    sz==0 || vr=="XX" ? {} :
+    sz==0 || vr=="XX" ? Any[] :
     
     vr == "SQ" ? sequence_parse(st, evr, sz) :
     
@@ -292,7 +292,7 @@ function element(st, evr, dcm)
     vr == "OF" ? read(st, Float32, div(sz,4)) :
     vr == "OW" ? read(st, Uint16 , div(sz,2)) :
     
-    vr == "AT" ? { read(st,Uint16,2) | n=1:div(sz,4) } :
+    vr == "AT" ? Any[ read(st,Uint16,2) for n=1:div(sz,4) ] :
     
     vr == "AS" ? ASCIIString(read(st,Uint8,4)) :
     
@@ -314,7 +314,7 @@ function element(st, evr, dcm)
     if isodd(sz) && sz != 0xffffffff
         skip(st, 1)
     end
-    delt = DcmElt(gelt, isa(data,Vector{Any}) ? data : {data})
+    delt = DcmElt(gelt, isa(data,Vector{Any}) ? data : Any[data])
     if diffvr
         # record non-standard VR
         delt.vr = vr
@@ -377,7 +377,7 @@ function dcm_parse(st)
     sig = ASCIIString(read(st,Uint8,2))
     evr = contains(VR_names, sig)
     skip(st, -6)
-    data = {}
+    data = Any[]
     while true
         fld = element(st, evr, data)
         if is(fld,false)
@@ -408,9 +408,9 @@ function dcm_write(st, d)
     evr = anyp(x->x.vr!="", d)
     # insert UID for our transfer syntax
     if evr
-        element_write(st, evr, DcmElt((0x0002,0x0010),{"1.2.840.10008.1.2.1"}))
+        element_write(st, evr, DcmElt((0x0002,0x0010),Any["1.2.840.10008.1.2.1"]))
     else
-        element_write(st, evr, DcmElt((0x0002,0x0010),{"1.2.840.10008.1.2"}))
+        element_write(st, evr, DcmElt((0x0002,0x0010),Any["1.2.840.10008.1.2"]))
     end
     for el in d
         element_write(st, evr, el)

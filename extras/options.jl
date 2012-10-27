@@ -182,7 +182,7 @@ macro defaults(opts,ex...)
     exret = :($(esc(symbol(varname))) = ischeck($(esc(opts))))
     # Transform the tuple into a vector, so that
     # we can manipulate it
-    ex = {ex...}
+    ex = Any[ex...]
     # Check each argument in the assignment list
     i = 1
     while i <= length(ex)
@@ -240,7 +240,7 @@ macro options(ex...)
     callargs = Any[:Options]
     # Transform the tuple into a vector, so that
     # we can manipulate it
-    ex = {ex...}
+    ex = Any[ex...]
     i = 1
     if length(ex) >= 1 && isa(ex[1], Symbol)
         push(callargs, esc(ex[1]))
@@ -280,7 +280,7 @@ macro set_options(opts,ex...)
     end
     # Transform the tuple into a vector, so that
     # we can manipulate it
-    ex = {ex...}
+    ex = Any[ex...]
     # Check each argument in the assignment list
     i = 1
     while i <= length(ex)

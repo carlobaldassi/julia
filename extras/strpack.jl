@@ -107,7 +107,7 @@ end
 # type := predefined_type | "{" identifier "}"
 # predefined_type := "x" | "c" | "b" | "B" | "?" | "h" | "i" | "I" | "l" | "L" | "q" | "Q" | "f" | "d"
 function struct_parse(s::String)
-    t = {}
+    t = Any[]
     i = 2
     endianness = if s[1] == '<'
         LittleEndian()
@@ -140,7 +140,7 @@ function struct_parse(s::String)
             'd' => Float64,
             #'s' => ASCIIString, #TODO
             }
-    t = {}
+    t = Any[]
     while i <= length(s)
         m = match(r"^                      # at the beginning of the string, find
                   (?:\[([a-zA-Z]\w*)\])?   # an optional name in []
@@ -184,7 +184,7 @@ end
 
 # Generate an anonymous composite type from a list of its element types
 function gen_typelist(types::Array)
-    xprs = {}
+    xprs = Any[]
     for (typ, dims, name) in types
         fn = !isa(name, Nothing) ? symbol(name) : gensym("field$(length(xprs)+1)")
         xpr = if dims == 1
@@ -215,7 +215,7 @@ end
 
 # Generate an unpack function for a composite type
 function gen_readers(convert::Function, types::Array, stream::Symbol, offset::Symbol, strategy::Symbol)
-    xprs, rvars = {}, {}
+    xprs, rvars = Any[], Any[]
     @gensym pad
     push(xprs, :($offset = 0))
     for (typ, dims) in types
@@ -256,7 +256,7 @@ end
 # Generate a pack function for a composite type
 function gen_writers(convert::Function, types::Array, struct_type, stream::Symbol, struct::Symbol, offset::Symbol, strategy::Symbol)
     @gensym fieldnames pad
-    xprs = {:(local $fieldnames = $struct_type.names), :($offset = 0)}
+    xprs = Any[:(local $fieldnames = $struct_type.names), :($offset = 0)]
     elnum = 0
     for (typ, dims) in types
         elnum += 1
@@ -457,7 +457,7 @@ end
 
 function pad(s::Struct, strategy::DataAlign)
     offset = 0
-    newtypes = {}
+    newtypes = Any[]
     for (typ, dims) in s.types
         fix = pad_next(offset, typ, strategy)
         if fix > 0

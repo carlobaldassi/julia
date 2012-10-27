@@ -53,7 +53,7 @@ end
 # read a message
 function __read_message()
     msg_type = read(__io, Uint8)
-    args = {}
+    args = Any[]
     num_args = read(__io, Uint8)
     for i=1:num_args
         arg_length = read(__io, Uint32)
@@ -116,7 +116,7 @@ function __socket_callback(fd)
         __lines = split(__input, '\n')
 
         # try to parse each line incrementally
-        __parsed_exprs = {}
+        __parsed_exprs = Any[]
         __input_so_far = ""
         __all_nothing = true
 
@@ -137,8 +137,8 @@ function __socket_callback(fd)
             # stop now if there was a parsing error
             if __expr_multitoken && __expr.head == :error
                 # send everyone the input
-                __write_message(__Message(__MSG_OUTPUT_EVAL_INPUT, {__user_id, __user_name, __input}))
-                return __write_message(__Message(__MSG_OUTPUT_EVAL_ERROR, {__user_id, __expr.args[1]}))
+                __write_message(__Message(__MSG_OUTPUT_EVAL_INPUT, Any[__user_id, __user_name, __input]))
+                return __write_message(__Message(__MSG_OUTPUT_EVAL_ERROR, Any[__user_id, __expr.args[1]]))
             end
             
             # if the expression was incomplete, just keep going
@@ -148,23 +148,23 @@ function __socket_callback(fd)
 
             # add the parsed expression to the list
             __input_so_far = ""
-            __parsed_exprs = [__parsed_exprs, {(__user_id, __expr)}]
+            __parsed_exprs = [__parsed_exprs, Any[(__user_id, __expr)]]
         end
 
         # if the input was empty, stop early
         if __all_nothing
             # send everyone the input
-            __write_message(__Message(__MSG_OUTPUT_EVAL_INPUT, {__user_id, __user_name, __input}))
-            return __write_message(__Message(__MSG_OUTPUT_EVAL_RESULT, {__user_id, ""}))
+            __write_message(__Message(__MSG_OUTPUT_EVAL_INPUT, Any[__user_id, __user_name, __input]))
+            return __write_message(__Message(__MSG_OUTPUT_EVAL_RESULT, Any[__user_id, ""]))
         end
 
         # tell the browser if we didn't get a complete expression
         if length(__parsed_exprs) == 0
-            return __write_message(__Message(__MSG_OUTPUT_EVAL_INCOMPLETE, {__user_id}))
+            return __write_message(__Message(__MSG_OUTPUT_EVAL_INCOMPLETE, Any[__user_id]))
         end
 
         # send everyone the input
-        __write_message(__Message(__MSG_OUTPUT_EVAL_INPUT, {__user_id, __user_name, __input}))
+        __write_message(__Message(__MSG_OUTPUT_EVAL_INPUT, Any[__user_id, __user_name, __input]))
 
         put(__eval_channel, __parsed_exprs)
     end
@@ -174,7 +174,7 @@ end
 add_fd_handler(__connectfd, __socket_callback)
 
 web_show(user_id, ans) =
-    __Message(__MSG_OUTPUT_EVAL_RESULT, {user_id, sprint(repl_show, ans)})
+    __Message(__MSG_OUTPUT_EVAL_RESULT, Any[user_id, sprint(repl_show, ans)])
 
 function __eval_exprs(__parsed_exprs)
     global ans
@@ -187,13 +187,13 @@ function __eval_exprs(__parsed_exprs)
         try
             ans = eval(__parsed_exprs[i][2])
         catch __error
-            return __write_message(__Message(__MSG_OUTPUT_EVAL_ERROR, {user_id, sprint(show, __error)}))
+            return __write_message(__Message(__MSG_OUTPUT_EVAL_ERROR, Any[user_id, sprint(show, __error)]))
         end
     end
     
     # send the result of the last expression
     if isa(ans,Nothing)
-        return __write_message(__Message(__MSG_OUTPUT_EVAL_RESULT, {user_id, ""}))
+        return __write_message(__Message(__MSG_OUTPUT_EVAL_RESULT, Any[user_id, ""]))
     else
         return __write_message(web_show(user_id, ans))
     end

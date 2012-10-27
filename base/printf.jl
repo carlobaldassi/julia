@@ -6,7 +6,7 @@ export @printf, @sprintf
 ### printf formatter generation ###
 
 function _gen(s::String)
-    args = {:(out::IO)}
+    args = Any[:(out::IO)]
     blk = expr(:block, :(local neg, pt, len, exp))
     for x in _parse(s)
         if isa(x,String)
@@ -33,7 +33,7 @@ end
 
 function _parse(s::String)
     # parse format string in to stings and format tuples
-    list = {}
+    list = Any[]
     i = j = start(s)
     while !done(s,j)
         c, k = next(s,j)
@@ -777,7 +777,7 @@ macro printf(args...)
         fmt = args[2]
         args = args[3:]
     end
-    args = {io,args...}
+    args = Any[io,args...]
     sym_args, blk = _gen(fmt)
     if length(sym_args) != length(args)
         error("@printf: wrong number of arguments")

@@ -217,12 +217,12 @@ function _start()
         if !anyp(a->(a=="--worker"), ARGS)
             # start in "head node" mode
             global const Scheduler = Task(()->event_loop(true), 1024*1024)
-            global PGRP = ProcessGroup(1, {LocalProcess()}, {Location("",0)})
+            global PGRP = ProcessGroup(1, Any[LocalProcess()], Any[Location("",0)])
             # make scheduler aware of current (root) task
             enq_work(_jl_roottask_wi)
             yield()
         else
-            global PGRP = ProcessGroup(0, {}, {})
+            global PGRP = ProcessGroup(0, Any[], Any[])
         end
 
         global const LOAD_PATH = String[
@@ -255,7 +255,7 @@ function _start()
     end
 end
 
-const _jl_atexit_hooks = {}
+const _jl_atexit_hooks = Any[]
 
 atexit(f::Function) = (enqueue(_jl_atexit_hooks, f); nothing)
 

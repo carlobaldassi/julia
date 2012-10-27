@@ -48,7 +48,7 @@ end
 
 let
 #  Prefix        ToSINone      Show          PrettyShow   LatexShow  Full
-const prefix_table = {
+const prefix_table = [
   (Yocto,        1e-24,        "y",          "y",         "y",       "yocto")
   (Zepto,        1e-21,        "z",          "z",         "z",       "zepto")
   (Atto,         1e-18,        "a",          "a",         "a",       "atto")
@@ -69,7 +69,7 @@ const prefix_table = {
   (Exa,          1e18,         "E",          "E",         "E",       "exa")
   (Zetta,        1e21,         "Z",          "Z",         "Z",       "zetta")
   (Yotta,        1e24,         "Y",          "Y",         "Y",       "yotta")
-}
+]
 global to_reference
 global show
 global pshow

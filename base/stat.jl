@@ -77,25 +77,25 @@ operm(mode::Unsigned) = uint8(mode     ) & 0x7
 
 # mode predicate methods for file names & stat objects
 
-for f in {
-    :ispath
-    :isfifo
-    :ischardev
-    :isdir
-    :isblockdev
-    :isfile
-    :islink
-    :issocket
-    :issetuid
-    :issetgid
-    :issticky
-    :isreadable
-    :iswriteable
-    :isexecutable
-    :uperm
-    :gperm
-    :operm
-}
+for f in Any[
+    :ispath,
+    :isfifo,
+    :ischardev,
+    :isdir,
+    :isblockdev,
+    :isfile,
+    :islink,
+    :issocket,
+    :issetuid,
+    :issetgid,
+    :issticky,
+    :isreadable,
+    :iswriteable,
+    :isexecutable,
+    :uperm,
+    :gperm,
+    :operm,
+]
     @eval ($f)(st::Stat)     = ($f)(st.mode)
     @eval ($f)(path::String) = ($f)(stat(path))
 end

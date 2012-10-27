@@ -10,7 +10,7 @@ function web_show(user_id, p::PlotContainer)
     try
         g = svg(p)
     catch err
-        return __Message(__MSG_OUTPUT_EVAL_ERROR, {user_id, sprint(show,err)})
+        return __Message(__MSG_OUTPUT_EVAL_ERROR, Any[user_id, sprint(show,err)])
     end
-    return __Message(__MSG_OUTPUT_HTML, {user_id, g})
+    return __Message(__MSG_OUTPUT_HTML, Any[user_id, g])
 end

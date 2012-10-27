@@ -1251,7 +1251,7 @@ end
 
 let findn_cache = nothing
 function findn_one(ivars)
-    s = { quote I[$i][count] = $(ivars[i]) end for i = 1:length(ivars)}
+    s = Any[ quote I[$i][count] = $(ivars[i]) end for i = 1:length(ivars)]
     quote
     	Aind = A[$(ivars...)]
     	if Aind != z
@@ -1351,12 +1351,12 @@ areduce{T}(f::Function, A::StridedArray{T}, region::Dimspec, v0) =
 let areduce_cache = nothing
 # generate the body of the N-d loop to compute a reduction
 function gen_areduce_func(n, f)
-    ivars = { symbol(string("i",i)) for i=1:n }
+    ivars = Any[ symbol(string("i",i)) for i=1:n ]
     # limits and vars for reduction loop
-    lo    = { symbol(string("lo",i)) for i=1:n }
-    hi    = { symbol(string("hi",i)) for i=1:n }
-    rvars = { symbol(string("r",i)) for i=1:n }
-    setlims = { quote
+    lo    = Any[ symbol(string("lo",i)) for i=1:n ]
+    hi    = Any[ symbol(string("hi",i)) for i=1:n ]
+    rvars = Any[ symbol(string("r",i)) for i=1:n ]
+    setlims = Any[ quote
         # each dim of reduction is either 1:sizeA or ivar:ivar
         if contains(region,$i)
             $(lo[i]) = 1
@@ -1364,8 +1364,8 @@ function gen_areduce_func(n, f)
         else
             $(lo[i]) = $(hi[i]) = $(ivars[i])
         end
-               end for i=1:n }
-    rranges = { :( $(lo[i]):$(hi[i]) ) for i=1:n }  # lo:hi for all dims
+               end for i=1:n ]
+    rranges = Any[ :( $(lo[i]):$(hi[i]) ) for i=1:n ]  # lo:hi for all dims
     body =
     quote
         _tot = v0
@@ -1379,7 +1379,7 @@ function gen_areduce_func(n, f)
         local _F_
         function _F_(f, A, region, R, v0)
             _ind = 1
-            $(make_loop_nest(ivars, { :(1:size(R,$i)) for i=1:n }, body))
+            $(make_loop_nest(ivars, Any[ :(1:size(R,$i)) for i=1:n ], body))
         end
         _F_
     end
@@ -1736,7 +1736,7 @@ ctranspose{T<:Number}(x::StridedMatrix{T}) = [ conj(x[j,i]) for i=1:size(x,2), j
 
 ## Permute ##
 
-let permute_cache = nothing, stridenames::Array{Any,1} = {}
+let permute_cache = nothing, stridenames::Array{Any,1} = Any[]
 global permute
 function permute(A::StridedArray, perm)
     dimsA = size(A)
@@ -1765,7 +1765,7 @@ function permute(A::StridedArray, perm)
 
     function permute_one(ivars)
         len = length(ivars)
-        counts = { symbol(string("count",i)) for i=1:len}
+        counts = Any[ symbol(string("count",i)) for i=1:len]
         toReturn = cell(len+1,2)
         for i = 1:numel(toReturn)
             toReturn[i] = nothing

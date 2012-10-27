@@ -1346,7 +1346,7 @@ end
 
 let findn_cache = nothing
 function findn_one(ivars)
-    s = { quote I[$i][count] = $(ivars[i]) end for i = 1:length(ivars)}
+    s = Any[ quote I[$i][count] = $(ivars[i]) end for i = 1:length(ivars)]
     quote
     	Bind = B[$(ivars...)]
     	if Bind != z
@@ -1390,12 +1390,12 @@ areduce(f::Function, B::BitArray, region::Dimspec, v0, RType::Type) =
 let bitareduce_cache = nothing
 # generate the body of the N-d loop to compute a reduction
 function gen_bitareduce_func(n, f)
-    ivars = { gensym() for i=1:n }
+    ivars = Any[ gensym() for i=1:n ]
     # limits and vars for reduction loop
-    lo    = { gensym() for i=1:n }
-    hi    = { gensym() for i=1:n }
-    rvars = { gensym() for i=1:n }
-    setlims = { quote
+    lo    = Any[ gensym() for i=1:n ]
+    hi    = Any[ gensym() for i=1:n ]
+    rvars = Any[ gensym() for i=1:n ]
+    setlims = Any[ quote
         # each dim of reduction is either 1:sizeA or ivar:ivar
         if contains(region,$i)
             $(lo[i]) = 1
@@ -1403,8 +1403,8 @@ function gen_bitareduce_func(n, f)
         else
             $(lo[i]) = $(hi[i]) = $(ivars[i])
         end
-               end for i=1:n }
-    rranges = { :( $(lo[i]):$(hi[i]) ) for i=1:n }  # lo:hi for all dims
+               end for i=1:n ]
+    rranges = Any[ :( $(lo[i]):$(hi[i]) ) for i=1:n ]  # lo:hi for all dims
     body =
     quote
         _tot = v0
@@ -1418,7 +1418,7 @@ function gen_bitareduce_func(n, f)
         local _F_
         function _F_(f, A, region, R, v0)
             _ind = 1
-            $(make_loop_nest(ivars, { :(1:size(R,$i)) for i=1:n }, body))
+            $(make_loop_nest(ivars, Any[ :(1:size(R,$i)) for i=1:n ], body))
         end
         _F_
     end
@@ -1616,7 +1616,7 @@ ctranspose(B::BitArray) = transpose(B)
 
 ## Permute ##
 
-let permute_cache = nothing, stridenames::Array{Any,1} = {}
+let permute_cache = nothing, stridenames::Array{Any,1} = Any[]
 global permute
 function permute(B::BitArray, perm)
     dimsB = size(B)
@@ -1640,7 +1640,7 @@ function permute(B::BitArray, perm)
 
     function permute_one(ivars)
         len = length(ivars)
-        counts = { gensym() for i=1:len}
+        counts = Any[ gensym() for i=1:len ]
         toReturn = cell(len+1,2)
         for i = 1:numel(toReturn)
             toReturn[i] = nothing

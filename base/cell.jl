@@ -16,12 +16,12 @@ function cell_2d(nr, nc, xs::ANY...)
 end
 
 # map cell array
-map(f, a::Array{Any,1}) = { f(a[i]) for i=1:length(a) }
+map(f, a::Array{Any,1}) = Any[ f(a[i]) for i=1:length(a) ]
 map(f, a::Array{Any,1}, b::Array{Any,1}) =
-    { f(a[i],b[i]) for i=1:length_checked_equal(a, b) }
+    Any[ f(a[i],b[i]) for i=1:length_checked_equal(a, b) ]
 function map(f, as::Array{Any,1}...)
     n = length_checked_equal(as...)
-    { f(map(a->a[i],as)...) for i=1:n }
+    Any[ f(map(a->a[i],as)...) for i=1:n ]
 end
 
 cell(dims::(Integer...))   = Array(Any, map(int, dims))

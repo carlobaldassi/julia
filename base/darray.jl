@@ -360,7 +360,7 @@ function _jl_distribute_one(T, lsz, da, distdim, owner, orig_array)
     i1 = da.dist[p]             # my first index in distdim
     iend = i1+lsz[distdim]-1    # my last  "
     # indexes of original array I will take
-    idxs = { 1:lsz[i] for i=1:length(da.dims) }
+    idxs = Any[ 1:lsz[i] for i=1:length(da.dims) ]
     idxs[distdim] = (i1:iend)
     remote_call_fetch(owner, ref, orig_array, idxs...)
 end
@@ -369,7 +369,7 @@ convert{T,N}(::Type{Array}, d::DArray{T,N}) = convert(Array{T,N}, d)
 
 function convert{S,T,N}(::Type{Array{S,N}}, d::DArray{T,N})
     a = Array(S, size(d))
-    idxs = { 1:size(a,i) for i=1:N }
+    idxs = Any[ 1:size(a,i) for i=1:N ]
     for p = 1:length(d.dist)-1
         idxs[d.distdim] = d.dist[p]:(d.dist[p+1]-1)
         a[idxs...] = remote_call_fetch(d.pmap[p], localize, d)
@@ -854,7 +854,7 @@ function (==)(A::DArray, B::DArray)
         return false
     end
     mapreduce(all, fetch,
-              { @spawnat p localize(A)==localize(B,A) for p in procs(A) })
+              Any[ @spawnat p localize(A)==localize(B,A) for p in procs(A) ])
 end
 
 function (!=)(A::DArray, B::DArray)
@@ -862,17 +862,17 @@ function (!=)(A::DArray, B::DArray)
         return true
     end
     mapreduce(any, fetch,
-              { @spawnat p localize(A)!=localize(B,A) for p in procs(A) })
+              Any[ @spawnat p localize(A)!=localize(B,A) for p in procs(A) ])
 end
 
 function reduce(f, v::DArray)
     mapreduce(f, fetch,
-              { @spawnat p reduce(f,localize(v)) for p = procs(v) })
+              Any[ @spawnat p reduce(f,localize(v)) for p = procs(v) ])
 end
 
 function mapreduce(op, f, v::DArray)
     mapreduce(op, fetch,
-              { @spawnat p mapreduce(op,f,localize(v)) for p = procs(v) })
+              Any[ @spawnat p mapreduce(op,f,localize(v)) for p = procs(v) ])
 end
 
 sum(d::DArray) = reduce(+, d)
@@ -896,7 +896,7 @@ function sum{T}(A::DArray{T}, d::Int)
     if d == distdim(A)
         darray(S, sz, distdim(A)) do T,lsz,da
             mapreduce(+, fetch,
-                      {@spawnat p sum(localize(A),d) for p in procs(A)})
+                      Any[@spawnat p sum(localize(A),d) for p in procs(A)])
         end
     else
         darray((T,lsz,da)->sum(localize(A),d), S, sz, distdim(A), procs(A))

@@ -2,7 +2,7 @@
 ##
 ## julia starts with one process, and processors can be added using:
 ##   addprocs_local(n)                     using exec
-##   addprocs_ssh({"host1","host2",...})   using remote execution
+##   addprocs_ssh(["host1","host2",...])   using remote execution
 ##   addprocs_sge(n)                       using Sun Grid Engine batch queue
 ##
 ## remote_call(w, func, args...) -
@@ -105,7 +105,7 @@ type Worker
         Worker(host, port, fd, fdio(fd, true))
     end
 
-    Worker(host,port,fd,sock,id) = new(host, port, fd, sock, memio(), {}, {}, id, false)
+    Worker(host,port,fd,sock,id) = new(host, port, fd, sock, memio(), Any[], Any[], id, false)
     Worker(host,port,fd,sock) = Worker(host,port,fd,sock,0)
 end
 
@@ -770,7 +770,7 @@ function perform_work(job::WorkItem)
             # to avoid scheduling overhead for a typical produce/consume,
             # there is no fairness unless consumers explicitly yield().
             if P.consumers === nothing
-                P.consumers = {job}
+                P.consumers = Any[job]
             else
                 enqueue(P.consumers, job)
             end
@@ -782,7 +782,7 @@ function perform_work(job::WorkItem)
             waitinfo = (wf.msg, job, rr)
             waiters = get(Waiting, oid, false)
             if isequal(waiters,false)
-                Waiting[oid] = {waitinfo}
+                Waiting[oid] = Any[waitinfo]
             else
                 push(waiters, waitinfo)
             end
@@ -810,7 +810,7 @@ function deliver_result(sock::IOStream, msg, oid, value)
     end
 end
 
-const _jl_empty_cell_ = {}
+const _jl_empty_cell_ = Any[]
 function deliver_result(sock::(), msg, oid, value_thunk)
     global Waiting
     # restart task that's waiting on oid
@@ -1058,9 +1058,9 @@ function addprocs_ssh(machines, keys)
     if !(isa(keys, Array)) && isa(machines,Array)
         key = keys
         keys = [ key for x = 1:numel(machines)]
-        cmdargs = { {machines[x],keys[x]} for x = 1:numel(machines)}
+        cmdargs = Any[ Any[machines[x],keys[x]] for x = 1:numel(machines)]
     else
-        cmdargs = {{machines,keys}}
+        cmdargs = Any[Any[machines,keys]]
     end #if/else
     add_workers(PGRP, start_remote_workers(machines, map(x->worker_ssh_cmd(x[1],x[2]), cmdargs)))
 end #func
@@ -1068,8 +1068,8 @@ end #func
 worker_local_cmd() = `$JULIA_HOME/julia-release-basic --worker`
 
 addprocs_local(np::Integer) =
-    add_workers(PGRP, start_remote_workers({ "localhost" for i=1:np },
-                                           { worker_local_cmd() for i=1:np }))
+    add_workers(PGRP, start_remote_workers(Any[ "localhost" for i=1:np ],
+                                           Any[ worker_local_cmd() for i=1:np ]))
 
 
 function start_sge_workers(n)
@@ -1204,7 +1204,7 @@ type GlobalObject
                 midx = i
             end
         end
-        rids = { rr2id(r[i]) for i=1:np }
+        rids = Any[ rr2id(r[i]) for i=1:np ]
         for p in procs
             if p != mi
                 remote_do(p, init_GlobalObject, p, procs, rids, initializer)
@@ -1291,7 +1291,7 @@ end
 
 ## higher-level functions: spawn, pmap, pfor, etc. ##
 
-sync_begin() = tls(:SPAWNS, ({}, get(tls(), :SPAWNS, ())))
+sync_begin() = tls(:SPAWNS, (Any[], get(tls(), :SPAWNS, ())))
 
 function sync_end()
     spawns = get(tls(), :SPAWNS, ())
@@ -1349,7 +1349,7 @@ let lastp = 1
     end
 end
 
-find_vars(e) = find_vars(e, {})
+find_vars(e) = find_vars(e, Any[])
 function find_vars(e, lst)
     if isa(e,Symbol)
         if !isdefined(e) || isconst(e)
@@ -1371,7 +1371,7 @@ function localize_vars(expr)
     # requires a special feature of the front end that knows how to insert
     # the correct variables. the list of free variables cannot be computed
     # from a macro.
-    Expr(:localize, {:(()->($expr)), v...}, Any)
+    Expr(:localize, Any[:(()->($expr)), v...], Any)
 end
 
 macro spawn(expr)
@@ -1420,7 +1420,7 @@ end
 function pmap_static(f, lsts...)
     np = nprocs()
     n = length(lsts[1])
-    { remote_call((i-1)%np+1, f, map(L->L[i], lsts)...) for i = 1:n }
+    Any[ remote_call((i-1)%np+1, f, map(L->L[i], lsts)...) for i = 1:n ]
 end
 
 pmap(f) = f()
@@ -1429,7 +1429,7 @@ pmap(f) = f()
 # as it finishes.
 # example unbalanced workload:
 # rsym(n) = (a=rand(n,n);a*a')
-# L = {rsym(200),rsym(1000),rsym(200),rsym(1000),rsym(200),rsym(1000),rsym(200),rsym(1000)};
+# L = Any[rsym(200),rsym(1000),rsym(200),rsym(1000),rsym(200),rsym(1000),rsym(200),rsym(1000)];
 # pmap(eig, L);
 function pmap(f, lsts...)
     np = nprocs()
@@ -1557,7 +1557,7 @@ end
 
 # fv(a)=eig(a)[2][2]
 # A=randn(800,800);A=A*A';
-# pmap(fv, {A,A,A})
+# pmap(fv, Any[A,A,A])
 
 #all2all() = at_each(hello_from, myid())
 

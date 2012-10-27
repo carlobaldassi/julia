@@ -10,31 +10,31 @@ const _jl_ser_tag = ObjectIdDict()
 const _jl_deser_tag = ObjectIdDict()
 let i = 2
     global _jl_ser_tag, _jl_deser_tag
-    for t = {Symbol, Int8, Uint8, Int16, Uint16, Int32, Uint32,
-             Int64, Uint64, Int128, Uint128, Float32, Float64, Char, Ptr,
-             AbstractKind, UnionKind, BitsKind, CompositeKind, Function,
-             Tuple, Array, Expr, LongSymbol, LongTuple, LongExpr,
-             LineNumberNode, SymbolNode, LabelNode, GotoNode,
-             QuoteNode, TopNode, TypeVar, Box, LambdaStaticData,
-             Module, :reserved2, :reserved3, :reserved4,
-             :reserved5, :reserved6, :reserved7, :reserved8,
-             :reserved9, :reserved10, :reserved11, :reserved12,
-             
-             (), Bool, Any, :Any, None, Top, Undef, Type,
-             :Array, :TypeVar, :Box,
-             :lambda, :body, :return, :call, symbol("::"),
-             :(=), :null, :gotoifnot, :A, :B, :C, :M, :N, :T, :S, :X, :Y,
-             :a, :b, :c, :d, :e, :f, :g, :h, :i, :j, :k, :l, :m, :n, :o,
-             :p, :q, :r, :s, :t, :u, :v, :w, :x, :y, :z,
-             :add_int, :sub_int, :mul_int, :add_float, :sub_float,
-             :mul_float, :unbox, :box,
-             :eq_int, :slt_int, :sle_int, :ne_int,
-             :arrayset, :arrayref,
-             :reserved13, :reserved14, :reserved15, :reserved16,
-             :reserved17, :reserved18, :reserved19, :reserved20,
-             false, true, nothing, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
-             12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27,
-             28, 29, 30, 31, 32}
+    for t = Any[Symbol, Int8, Uint8, Int16, Uint16, Int32, Uint32,
+                Int64, Uint64, Int128, Uint128, Float32, Float64, Char, Ptr,
+                AbstractKind, UnionKind, BitsKind, CompositeKind, Function,
+                Tuple, Array, Expr, LongSymbol, LongTuple, LongExpr,
+                LineNumberNode, SymbolNode, LabelNode, GotoNode,
+                QuoteNode, TopNode, TypeVar, Box, LambdaStaticData,
+                Module, :reserved2, :reserved3, :reserved4,
+                :reserved5, :reserved6, :reserved7, :reserved8,
+                :reserved9, :reserved10, :reserved11, :reserved12,
+                
+                (), Bool, Any, :Any, None, Top, Undef, Type,
+                :Array, :TypeVar, :Box,
+                :lambda, :body, :return, :call, symbol("::"),
+                :(=), :null, :gotoifnot, :A, :B, :C, :M, :N, :T, :S, :X, :Y,
+                :a, :b, :c, :d, :e, :f, :g, :h, :i, :j, :k, :l, :m, :n, :o,
+                :p, :q, :r, :s, :t, :u, :v, :w, :x, :y, :z,
+                :add_int, :sub_int, :mul_int, :add_float, :sub_float,
+                :mul_float, :unbox, :box,
+                :eq_int, :slt_int, :sle_int, :ne_int,
+                :arrayset, :arrayref,
+                :reserved13, :reserved14, :reserved15, :reserved16,
+                :reserved17, :reserved18, :reserved19, :reserved20,
+                false, true, nothing, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
+                12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27,
+                28, 29, 30, 31, 32]
         _jl_ser_tag[t] = int32(i)
         _jl_deser_tag[int32(i)] = t
         i += 1
@@ -339,7 +339,7 @@ deserialize(s, ::Type{LongExpr}) = deserialize_expr(s, read(s, Int32))
 function deserialize_expr(s, len)
     hd = deserialize(s)::Symbol
     ty = force(deserialize(s))
-    args = { deserialize(s) for i=1:len }
+    args = Any[ deserialize(s) for i=1:len ]
     function ()
         e = expr(hd, map(force, args))
         e.typ = ty

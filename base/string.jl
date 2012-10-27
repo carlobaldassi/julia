@@ -698,7 +698,7 @@ check_utf8 (s::ByteString) = is_valid_utf8(s)  ? s : error("invalid UTF-8 sequen
 ## string interpolation parsing ##
 
 function _jl_interp_parse(s::String, unescape::Function, printer::Function)
-    sx = {}
+    sx = Any[]
     i = j = start(s)
     while !done(s,j)
         c, k = next(s,j)
@@ -756,8 +756,8 @@ function _jl_shell_parse(raw::String, interp::Bool)
     in_single_quotes = false
     in_double_quotes = false
 
-    args = {}
-    arg = {}
+    args = Any[]
+    arg = Any[]
     i = start(s)
     j = i
 
@@ -767,9 +767,9 @@ function _jl_shell_parse(raw::String, interp::Bool)
         end
     end
     function append_arg()
-        if isempty(arg); arg = {"",}; end
+        if isempty(arg); arg = Any["",]; end
         push(args, arg)
-        arg = {}
+        arg = Any[]
     end
 
     while !done(s,j)
@@ -835,7 +835,7 @@ function _jl_shell_parse(raw::String, interp::Bool)
     end
 
     # construct an expression
-    exprs = {}
+    exprs = Any[]
     for arg in args
         push(exprs, expr(:tuple, arg))
     end

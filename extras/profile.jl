@@ -3,14 +3,14 @@ _PROFILE_DESCEND = 2
 _PROFILE_STATE = _PROFILE_LINES | _PROFILE_DESCEND    # state is a bitfield
 
 # Record of expressions to parse according to the current _PROFILE_STATE
-_PROFILE_EXPR = {}
+_PROFILE_EXPR = Any[]
 
 # To avoid the performance penalty of global variables, we design the
 # macro to create local variables through a "let" block that shares
 # the timing and count data with "reporting" and "clearing" functions.
-_PROFILE_REPORTS = {}  # list of reporting functions
-_PROFILE_CLEARS = {}   # list of clearing functions
-_PROFILE_TAGS = {}     # line #s for all timing variables
+_PROFILE_REPORTS = Any[]  # list of reporting functions
+_PROFILE_CLEARS = Any[]   # list of clearing functions
+_PROFILE_TAGS = Any[]     # line #s for all timing variables
 
 # Profile calibration, to compensate for the overhead of calling time()
 _PROFILE_CALIB = 0
@@ -85,7 +85,7 @@ function insert_profile_block(fblock::Expr, tlast, tnow, timers, counters, tags,
         error("expression is not a block")
     end
     descend = _PROFILE_STATE & _PROFILE_DESCEND > 0
-    fblocknewargs = {}
+    fblocknewargs = Any[]
     for i = 1:length(fblock.args)
         if isa(fblock.args[i],LineNumberNode) || is_expr_head(fblock.args[i], :line)
             # This is a line expression, so no counters/timers required
@@ -116,7 +116,7 @@ function insert_profile_block(fblock::Expr, tlast, tnow, timers, counters, tags,
             #   timers[indx] += timehr_diff(tlast, tnow)
             #   counters[indx] += 1
             #   timehr(_PROFILE_USE_CLOCK, tlast) # start time for next
-            append!(fblocknewargs,{:($tnow = time_ns()), :(($timers)[($indx)] += $tnow - $tlast), :(($counters)[($indx)] += 1), :($tlast = time_ns())})
+            append!(fblocknewargs,Any[:($tnow = time_ns()), :(($timers)[($indx)] += $tnow - $tlast), :(($counters)[($indx)] += 1), :($tlast = time_ns())])
             indx += 1
             if saveret
                 push(fblocknewargs, :(return $retsym))
@@ -132,12 +132,12 @@ function insert_profile_cf(ex::Expr, tlast, tnow, timers, counters, tags, indx::
     if length(ex.args) == 2
         # This is a for, while, or 2-argument if or try block
         block1, indx = insert_profile(ex.args[2], tlast, tnow, timers, counters, tags, indx, retsym, rettest)
-        return expr(ex.head, {ex.args[1], block1}), indx
+        return expr(ex.head, Any[ex.args[1], block1]), indx
     elseif length(ex.args) == 3
         # This is for a 3-argument if or try block
         block1, indx = insert_profile(ex.args[2], tlast, tnow, timers, counters, tags, indx, retsym, rettest)
         block2, indx = insert_profile(ex.args[3], tlast, tnow, timers, counters, tags, indx, retsym, rettest)
-        return expr(ex.head, {ex.args[1], block1, block2}), indx
+        return expr(ex.head, Any[ex.args[1], block1, block2]), indx
     else
         error("Wrong number of arguments")
     end
@@ -175,8 +175,8 @@ function insert_profile_function(ex::Expr, tlast, tnow, timers, counters, tags, 
     # Insert the profiling statements in the function
     fblocknewargs, indx = insert_profile_block(fblock, tlast, tnow, timers, counters, tags, indx, retsym, savefunc)
     # Prepend the initialization of tlast
-    fblocknewargs = vcat({:($tlast = time_ns())}, fblocknewargs.args)
-    return expr(:function,{funcsyntax(ex),expr(:block,fblocknewargs)}), indx
+    fblocknewargs = vcat(Any[:($tlast = time_ns())], fblocknewargs.args)
+    return expr(:function,Any[funcsyntax(ex),expr(:block,fblocknewargs)]), indx
 end
 
 function profile_parse(ex::Expr)
@@ -187,7 +187,7 @@ function profile_parse(ex::Expr)
         timers = gensym()
         counters = gensym()
         # Keep track of line numbers
-        tags = {}
+        tags = Any[]
         # Preserve return values
         retsym = gensym()
         # Create the symbols used for reporting and clearing the data
@@ -196,7 +196,7 @@ function profile_parse(ex::Expr)
         funcclear = gensym()
         # Parse the block and insert instructions
         indx = 1
-        coreargs = {}
+        coreargs = Any[]
         if ex.head == :block
             # This is a block which may contain many function declarations
             for i = 1:length(ex.args)
@@ -223,16 +223,16 @@ function profile_parse(ex::Expr)
         # Because we're using a gensym for the function name, we can't
         # quote the whole thing
         push(coreargs, expr(:global, funcreport))
-        push(coreargs, expr(:function, {expr(:call, {funcreport}), expr(:block,{:(return $timers, $counters)})}))
+        push(coreargs, expr(:function, Any[expr(:call, Any[funcreport]), expr(:block,Any[:(return $timers, $counters)])]))
         # Insert clearing function
         push(coreargs, expr(:global, funcclear))
-        push(coreargs, expr(:function, {expr(:call, {funcclear}), expr(:block,{:(fill!($timers,0)), :(fill!($counters,0))})}))
+        push(coreargs, expr(:function, Any[expr(:call, Any[funcclear]), expr(:block,Any[:(fill!($timers,0)), :(fill!($counters,0))])]))
         # Put all this inside a let block
         excore = expr(:block,coreargs)
-        exlet = expr(:let,{expr(:block,excore), :($timers = zeros(Uint64, $n_lines)), :($counters = zeros(Uint64, $n_lines))})
+        exlet = expr(:let,Any[expr(:block,excore), :($timers = zeros(Uint64, $n_lines)), :($counters = zeros(Uint64, $n_lines))])
         return exlet, tags, funcreport, funcclear
     else
-        return ex ,{}, :funcnoop, :funcnoop
+        return ex ,Any[], :funcnoop, :funcnoop
     end
 end
 
@@ -243,7 +243,7 @@ function profile_parse_all()
     del_all(_PROFILE_REPORTS)
     del_all(_PROFILE_CLEARS)
     del_all(_PROFILE_TAGS)
-    retargs = {}
+    retargs = Any[]
     for i = 1:length(_PROFILE_EXPR)
         newblock, tags, funcreport, funcclear = profile_parse(_PROFILE_EXPR[i])
         retargs = vcat(retargs, newblock.args)
@@ -260,9 +260,9 @@ end
 function profile_report()
     exret = cell(length(_PROFILE_REPORTS)+2)
     ret = gensym()
-    exret[1] = :($ret = {})
+    exret[1] = :($ret = Any[])
     for i = 1:length(_PROFILE_REPORTS)
-        exret[i+1] = :(push($ret,$(expr(:call,{_PROFILE_REPORTS[i]}))))
+        exret[i+1] = :(push($ret,$(expr(:call,Any[_PROFILE_REPORTS[i]]))))
     end
     exret[end] = :(profile_print($ret))
     return expr(:block,exret)
@@ -299,7 +299,7 @@ end
 function profile_clear()
     exret = cell(length(_PROFILE_CLEARS)+1)
     for i = 1:length(_PROFILE_CLEARS)
-        exret[i] = expr(:call,{_PROFILE_CLEARS[i]})
+        exret[i] = expr(:call,Any[_PROFILE_CLEARS[i]])
     end
     exret[end] = :(return nothing)
     return expr(:block,exret)

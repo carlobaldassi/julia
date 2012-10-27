@@ -1005,7 +1005,7 @@ function typeinf(linfo::LambdaStaticData,atypes::Tuple,sparams::Tuple, def, cop)
 
     rec = false
 
-    s = { () for i=1:n }
+    s = Any[ () for i=1:n ]
     recpts = IntSet()  # statements that depend recursively on our value
     W = IntSet()
     # initial set of pc
@@ -1053,7 +1053,7 @@ function typeinf(linfo::LambdaStaticData,atypes::Tuple,sparams::Tuple, def, cop)
 
     # exception handlers
     cur_hand = ()
-    handler_at = { () for i=1:n }
+    handler_at = Any[ () for i=1:n ]
 
     while !isempty(W)
         pc = choose(W)
@@ -1181,7 +1181,7 @@ function typeinf(linfo::LambdaStaticData,atypes::Tuple,sparams::Tuple, def, cop)
     
     if !redo
         if is(def.tfunc,())
-            def.tfunc = ({},{})
+            def.tfunc = (Any[],Any[])
         end
         compr = (compr[1],compr[2],compr[3],compr[4],rec)
         push(def.tfunc[1]::Array{Any,1}, atypes)
@@ -1273,7 +1273,7 @@ function type_annotate(ast::Expr, states::Array{Any,1}, sv::ANY, rettype::ANY,
     for arg in args
         decls[arg] = states[1][arg]
     end
-    closures = {}
+    closures = Any[]
     body = ast.args[3].args::Array{Any,1}
     for i=1:length(body)
         body[i] = eval_annotate(body[i], states[i], sv, decls, closures)
@@ -1419,7 +1419,7 @@ function exprtype(x::ANY)
 end
 
 function without_linenums(a::Array{Any,1})
-    l = {}
+    l = Any[]
     for x in a
         if (isa(x,Expr) && is(x.head,:line)) || isa(x,LineNumberNode)
         else
@@ -1499,7 +1499,7 @@ function inlineable(f, e::Expr, sv, enclosing_ast)
         return NF
     end
     sp = meth[2]::Tuple
-    spvals = { sp[i] for i in 2:2:length(sp) }
+    spvals = Any[ sp[i] for i in 2:2:length(sp) ]
     for i=1:length(spvals)
         if isa(spvals[i],TypeVar)
             return NF
@@ -1532,7 +1532,7 @@ function inlineable(f, e::Expr, sv, enclosing_ast)
     if na>0 && is_rest_arg(ast.args[1][na])
         # construct tuple-forming expression for argument tail
         vararg = mk_tuplecall(argexprs[na:end])
-        argexprs = {argexprs[1:(na-1)]..., vararg}
+        argexprs = Any[argexprs[1:(na-1)]..., vararg]
     end
     expr = body[1].args[1]
 
@@ -1542,7 +1542,7 @@ function inlineable(f, e::Expr, sv, enclosing_ast)
         return NF
     end
 
-    stmts = {}
+    stmts = Any[]
     # see if each argument occurs only once in the body expression
     for i=1:length(args)
         a = args[i]
@@ -1556,7 +1556,7 @@ function inlineable(f, e::Expr, sv, enclosing_ast)
                 if occ > 1
                     vnew = unique_name(enclosing_ast)
                     add_variable(enclosing_ast, vnew, aeitype)
-                    push(stmts, Expr(:(=), {vnew, aei}, Any))
+                    push(stmts, Expr(:(=), Any[vnew, aei], Any))
                     argexprs[i] = aeitype===Any ? vnew : SymbolNode(vnew,aeitype)
                 elseif !isType(aeitype) && !effect_free(aei)
                     push(stmts, aei)
@@ -1566,7 +1566,7 @@ function inlineable(f, e::Expr, sv, enclosing_ast)
     end
 
     # ok, substitute argument expressions for argument names in the body
-    spnames = { sp[i].name for i=1:2:length(sp) }
+    spnames = Any[ sp[i].name for i=1:2:length(sp) ]
     expr = astcopy(expr)
     mfrom = meth[3].module; mto = (inference_stack::CallStack).mod
     if !is(mfrom, mto)
@@ -1588,7 +1588,7 @@ function mk_tupleref(texpr, i)
 end
 
 function mk_tuplecall(args)
-    Expr(:call1, {_jl_top_tuple, args...}, tuple(map(exprtype, args)...))
+    Expr(:call1, Any[_jl_top_tuple, args...], tuple(map(exprtype, args)...))
 end
 
 function inlining_pass(e::Expr, sv, ast)
@@ -1607,7 +1607,7 @@ function inlining_pass(e::Expr, sv, ast)
         i0 = 1
         isccall = false
     end
-    stmts = {}
+    stmts = Any[]
     if e.head === :body
         i = i0
         while i <= length(eargs)
@@ -1659,10 +1659,10 @@ function inlining_pass(e::Expr, sv, ast)
                 if isa(a1,Number) || ((isa(a1,Symbol) || isa(a1,SymbolNode)) &&
                                       exprtype(a1) <: Number)
                     if e.args[3]==2
-                        e.args = {_jl_tn(:*), a1, a1}
+                        e.args = Any[_jl_tn(:*), a1, a1]
                         f = *
                     elseif e.args[3]==3
-                        e.args = {_jl_tn(:*), a1, a1, a1}
+                        e.args = Any[_jl_tn(:*), a1, a1, a1]
                         f = *
                     end
                 end
@@ -1690,13 +1690,13 @@ function inlining_pass(e::Expr, sv, ast)
                     newargs[i-2] = aarg.args[2:]
                 elseif isa(t,Tuple) && !isvatuple(t) && effect_free(aarg)
                     # apply(f,t::(x,y)) => f(t[1],t[2])
-                    newargs[i-2] = { mk_tupleref(aarg,j) for j=1:length(t) }
+                    newargs[i-2] = Any[ mk_tupleref(aarg,j) for j=1:length(t) ]
                 else
                     # not all args expandable
                     return (e,stmts)
                 end
             end
-            e.args = [{e.args[2]}, newargs...]
+            e.args = [Any[e.args[2]], newargs...]
 
             # now try to inline the simplified call
             res = inlineable(_ieval(e.args[1]), e, sv, ast)
@@ -1716,15 +1716,15 @@ function inlining_pass(e::Expr, sv, ast)
 end
 
 function add_variable(ast, name, typ)
-    vinf = {name,typ,2}
+    vinf = Any[name,typ,2]
     locllist = ast.args[2][1]::Array{Any,1}
     vinflist = ast.args[2][2]::Array{Any,1}
     push(locllist, name)
     push(vinflist, vinf)
 end
 
-const some_names = {:_var0, :_var1, :_var2, :_var3, :_var4, :_var5, :_var6,
-                    :_var7, :_var8, :_var9, :_var10, :_var11, :_var12}
+const some_names =  Any[:_var0, :_var1, :_var2, :_var3, :_var4, :_var5, :_var6,
+                        :_var7, :_var8, :_var9, :_var10, :_var11, :_var12]
 
 function unique_name(ast)
     locllist = ast.args[2][1]::Array{Any,1}
@@ -1837,7 +1837,7 @@ function tuple_elim_pass(ast::Expr)
                 else
                     elty = exprtype(tupelt)
                     tmpv = unique_name(ast)
-                    tmp = Expr(:(=), {tmpv,tupelt}, Any)
+                    tmp = Expr(:(=), Any[tmpv,tupelt], Any)
                     add_variable(ast, tmpv, elty)
                     insert(body, i+n_ins, tmp)
                     vals[j] = SymbolNode(tmpv, elty)

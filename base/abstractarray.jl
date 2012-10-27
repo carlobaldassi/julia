@@ -213,8 +213,8 @@ end
 function gen_cartesian_map(cache, genbodies, ranges, exargnames, exargs...)
     N = length(ranges)
     if !has(cache,N)
-        dimargnames = { symbol(string("_d",i)) for i=1:N }
-        ivars = { symbol(string("_i",i)) for i=1:N }
+        dimargnames = Any[ symbol(string("_d",i)) for i=1:N ]
+        ivars = Any[ symbol(string("_i",i)) for i=1:N ]
         bodies = genbodies(ivars)
 
         ## creating a 2d array, to pass as bodies
@@ -334,10 +334,10 @@ end
 function gen_array_index_map(cache, genbody, ranges, exargnames, exargs...)
     N = length(ranges)
     if !has(cache,N)
-        dimargnames = { symbol(string("_d",i)) for i=1:N }
-        loopvars = { symbol(string("_l",i)) for i=1:N }
-        offsetvars = { symbol(string("_offs",i)) for i=1:N }
-        stridevars = { symbol(string("_stri",i)) for i=1:N }
+        dimargnames = Any[ symbol(string("_d",i)) for i=1:N ]
+        loopvars = Any[ symbol(string("_l",i)) for i=1:N ]
+        offsetvars = Any[ symbol(string("_offs",i)) for i=1:N ]
+        stridevars = Any[ symbol(string("_stri",i)) for i=1:N ]
         linearind = :_li
         body = genbody(linearind)
         fexpr = quote
@@ -1024,9 +1024,9 @@ function bsxfun(f, a::AbstractArray, b::AbstractArray)
     end
     c = Array(promote_type(eltype(a),eltype(b)), shp...)
 
-    aidxs = { 1:size(a,i) for i=1:nd }
-    bidxs = { 1:size(b,i) for i=1:nd }
-    cidxs = { 1:size(c,i) for i=1:nd }
+    aidxs = Any[ 1:size(a,i) for i=1:nd ]
+    bidxs = Any[ 1:size(b,i) for i=1:nd ]
+    cidxs = Any[ 1:size(c,i) for i=1:nd ]
 
     sliceop = function (idxs::Int...)
         j = 1

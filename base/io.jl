@@ -165,7 +165,7 @@ end
 next(itr::EachLine, this_line) = (this_line, readline(itr.stream))
 
 function readlines(s, fx::Function...)
-    a = {}
+    a = Any[]
     for l = each_line(s)
         for f in fx
           l = f(l)

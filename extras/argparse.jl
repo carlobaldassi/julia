@@ -596,7 +596,7 @@ end
 macro add_arg_table(s, x...)
     # transform the tuple into a vector, so that
     # we can manipulate it
-    x = {x...}
+    x = Any[x...]
     # escape the ArgParseSettings
     s = esc(s)
     # start building the return expression
@@ -1324,9 +1324,9 @@ function usage_string(settings::ArgParseSettings)
 
     lc_len_limit = 24
 
-    cmd_lst = {}
-    pos_lst = {}
-    opt_lst = {}
+    cmd_lst = Any[]
+    pos_lst = Any[]
+    opt_lst = Any[]
     for f in settings.args_table.fields
         if _is_cmd(f)
             if !isempty(f.short_opt_name)
@@ -1502,7 +1502,7 @@ function _show_help(settings::ArgParseSettings)
     for f in settings.args_table.fields
         dest_lst = group_lists[f.group]
         if _is_arg(f)
-            push(dest_lst, {f.metavar, _gen_help_text(f, settings)})
+            push(dest_lst, Any[f.metavar, _gen_help_text(f, settings)])
             max_lc_len = max(max_lc_len, strlen(f.metavar))
         else
             opt_str1 = join([["-"*x for x in f.short_opt_name], ["--"*x for x in f.long_opt_name]], ", ")
@@ -1523,7 +1523,7 @@ function _show_help(settings::ArgParseSettings)
                     _found_a_bug()
                 end
             end
-            new_opt = {opt_str1 * opt_str2, _gen_help_text(f, settings)}
+            new_opt = Any[opt_str1 * opt_str2, _gen_help_text(f, settings)]
             push(dest_lst, new_opt)
             max_lc_len = max(max_lc_len, strlen(new_opt[1]))
         end

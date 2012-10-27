@@ -132,7 +132,7 @@ done(it::RepeatForever, state) = false
 type Chain
     xss::Vector{Any}
     function Chain(xss...)
-        new({xss...})
+        new(Any[xss...])
     end
 end
 
@@ -172,7 +172,7 @@ done(it::Chain, state) = state[1] > length(it.xss)
 type Product
     xss::Vector{Any}
     function Product(xss...)
-        new({xss...})
+        new(Any[xss...])
     end
 end
 
@@ -180,7 +180,7 @@ product(xss...) = Product(xss...)
 
 function start(it::Product)
     n = length(it.xss)
-    js = {start(xs) for xs in it.xss}
+    js = Any[start(xs) for xs in it.xss]
     if n == 0
         return js, nothing
     end

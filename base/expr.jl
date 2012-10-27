@@ -22,11 +22,21 @@ macro gensym(names...)
     return blk
 end
 
-esc(e::ANY) = expr(:escape, {e})
+esc(e::ANY) = expr(:escape, Any[e])
 
 ## expressions ##
 
-expr(hd::Symbol, args::ANY...) = Expr(hd, {args...}, Any)
+function expr(hd::Symbol, args::ANY...)
+    # this does the same as Any[args...], but that
+    # notation is not yet available when this is bootstrapped
+    n = length(args)
+    a = Array(Any, n)
+    for i in 1:n
+        arrayset(a, args[i], i)
+    end
+    Expr(hd, a, Any)
+end
+#expr(hd::Symbol, args::ANY...) = Expr(hd, {args...}, Any)
 expr(hd::Symbol, args::Array{Any,1}) = Expr(hd, args, Any)
 copy(e::Expr) = Expr(e.head, isempty(e.args) ? e.args : astcopy(e.args), e.typ)
 copy(s::SymbolNode) = SymbolNode(s.name, s.typ)

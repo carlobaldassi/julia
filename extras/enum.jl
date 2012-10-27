@@ -2,7 +2,7 @@ macro enum(T,syms...)
     N = int(Int.nbits)
     T = esc(T)
     sh = expr(:block,
-              {:(if x===$sym return print($(string(sym))) end) for sym in syms})
+              Any[:(if x===$sym return print($(string(sym))) end) for sym in syms])
     blk = quote
         bitstype ($N) ($T)
         $(esc(:symbols))(_::Type{$T}) = $syms

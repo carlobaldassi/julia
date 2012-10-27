@@ -71,11 +71,11 @@ function plot(x::Array, y::Array, xmin::Number, xmax::Number, ymin::Number, ymax
     if ymin >= ymax return error("ymax must be greater than ymin") end
 
     # remove points with infinite or NaN components
-    pairs = {}
+    pairs = Any[]
     for i=1:length(x_safe)
         if x_safe[i] != Inf && x_safe[i] != -Inf && !isequal(x_safe[i], NaN)
             if y_safe[i] != Inf && y_safe[i] != -Inf && !isequal(y_safe[i], NaN)
-                pairs = [pairs, {(x_safe[i], y_safe[i])}]
+                pairs = [pairs, Any[(x_safe[i], y_safe[i])]]
             end
         end
     end
@@ -83,7 +83,7 @@ function plot(x::Array, y::Array, xmin::Number, xmax::Number, ymin::Number, ymax
     y_safe = [pairs[i][2] for i=1:length(pairs)]
 
     # send the message to the browser
-    __write_message(__Message(__MSG_OUTPUT_PLOT, {
+    __write_message(__Message(__MSG_OUTPUT_PLOT, Any[
         plottype,
         strcat("[", join([string(i) for i=x_safe], ","), "]"),
         strcat("[", join([string(i) for i=y_safe], ","), "]"),
@@ -91,7 +91,7 @@ function plot(x::Array, y::Array, xmin::Number, xmax::Number, ymin::Number, ymax
         string(float64(xmax)),
         string(float64(ymin)),
         string(float64(ymax))
-    }))
+    ]))
 end
 
 # plot an array (window determined automatically)

@@ -953,7 +953,7 @@ function make( self::Legend, context::PlotContext )
     shift( bbox, key_pos )
     dp = 0., -(key_vsep + key_height)
 
-    objs = {}
+    objs = Any[]
     for comp in self.components
         s = getattr( comp, "label", "" )
         t = TextObject( text_pos, s, getattr(self,"style") )
@@ -1000,7 +1000,7 @@ end
 
 function make( self::ErrorBarsX, context )
     l = _size_relative( getattr(self, "barsize"), context.dev_bbox ) 
-    objs = {}
+    objs = Any[]
     for i = 1:numel(self.y)
         p = context.geom( self.lo[i], self.y[i] )
         q = context.geom( self.hi[i], self.y[i] )
@@ -1038,7 +1038,7 @@ function limits( self::ErrorBarsY )
 end
 
 function make( self::ErrorBarsY, context )
-    objs = {}
+    objs = Any[]
     l = _size_relative( getattr(self, "barsize"), context.dev_bbox )
     for i = 1:numel(self.x)
         p = project( context.geom, self.x[i], self.lo[i] )
@@ -1386,7 +1386,7 @@ function _make_grid( self::HalfAxisX, context, ticks )
     if isequal(ticks,nothing)
         return
     end
-    objs = {}
+    objs = Any[]
     for tick in ticks
         push(objs, LineX(tick,getattr(self, "grid_style")))
     end
@@ -1484,7 +1484,7 @@ function _make_grid( self::HalfAxisY, context, ticks )
     if isequal(ticks,nothing)
         return
     end
-    objs = {}
+    objs = Any[]
     for tick in ticks
         push(objs, LineY(tick,getattr(self,"grid_style")))
     end
@@ -1549,7 +1549,7 @@ function _make_ticklabels( self::HalfAxis, context, pos, labels )
             getattr(self, "ticks_size"), context.dev_bbox )
     end
     # XXX:why did square brackets stop working?
-    labelpos = { _pos(self, context, pos[i], dir*offset) for i=1:length(labels) }
+    labelpos = Any[ _pos(self, context, pos[i], dir*offset) for i=1:length(labels) ]
 
     halign, valign = _align(self)
 
@@ -1578,7 +1578,7 @@ function _make_ticks( self::HalfAxis, context, ticks, size, style )
     dir = getattr(self, "tickdir") * getattr(self, "ticklabels_dir")
     ticklen = _dpos( self, dir * _size_relative(size, context.dev_bbox) )
     # XXX:why did square brackets stop working?
-    tickpos = { _pos(self, context, tick) for tick in ticks }
+    tickpos = Any[ _pos(self, context, tick) for tick in ticks ]
 
     CombObject(tickpos, ticklen, style)
 end
@@ -1600,7 +1600,7 @@ function make( self::HalfAxis, context )
     implicit_draw_ticklabels = is(draw_ticklabels,nothing) &&
         (!is(getattr(self, "range"),nothing) || !is(getattr(self, "ticklabels"),nothing))
 
-    objs = {}
+    objs = Any[]
     if getattr(self, "draw_grid")
         objs = _make_grid( self, context, ticks)
     end
@@ -1649,7 +1649,7 @@ type PlotComposite <: HasStyle
     dont_clip::Bool
 
     function PlotComposite(args...)
-        self = new(Dict(), {}, false)
+        self = new(Dict(), Any[], false)
         kw_init(self, args...)
         self
     end
@@ -1662,7 +1662,7 @@ function add( self::PlotComposite, args... )
 end
 
 function clear( self::PlotComposite )
-    self.components = {}
+    self.components = Any[]
 end
 
 function isempty( self::PlotComposite )
@@ -2578,7 +2578,7 @@ end
 
 function make( self::Curve, context )
     segs = geodesic( context.geom, self.x, self.y )
-    objs = {}
+    objs = Any[]
     for seg in segs
         x, y = project( context.geom, seg[1], seg[2] )
         push(objs, PathObject(x, y))
@@ -2616,23 +2616,23 @@ function make( self::Slope, context::PlotContext )
     xr = xrange(context.data_bbox)
     yr = yrange(context.data_bbox)
     if self.slope == 0
-        l = { ( xr[1], self.intercept[2] ),
-              ( xr[2], self.intercept[2] ) }
+        l = Any[ ( xr[1], self.intercept[2] ),
+                 ( xr[2], self.intercept[2] ) ]
     else
-        l = { ( xr[1], _y(self, xr[1]) ),
-              ( xr[2], _y(self, xr[2]) ),
-              ( _x(self, yr[1]), yr[1] ),
-              ( _x(self, yr[2]), yr[2] ) }
+        l = Any[ ( xr[1], _y(self, xr[1]) ),
+                 ( xr[2], _y(self, xr[2]) ),
+                 ( _x(self, yr[1]), yr[1] ),
+                 ( _x(self, yr[2]), yr[2] ) ]
     end
     #m = filter( context.data_bbox.contains, l )
-    m = {}
+    m = Any[]
     for el in l
         if contains(context.data_bbox, el)
             push(m, el)
         end
     end
     #sort!(m)
-    objs = {}
+    objs = Any[]
     if length(m) > 1
         a = project( context.geom, m[1]... )
         b = project( context.geom, m[end]... )
@@ -3175,7 +3175,7 @@ function setattr( self::HasAttr, name, value )
 end
 
 function iniattr(self::HasAttr, args...)
-    types = {typeof(self)}
+    types = Any[typeof(self)]
     while super(types[end]) != Any
         push(types, super(types[end]))
     end
