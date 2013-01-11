@@ -50,6 +50,28 @@ type ReqsStruct
         vers = versions(pkgs)
         deps = dependencies(pkgs,vers)
 
+        if has(ENV, "PKGRESOLVE_DBG")
+            println("PKGS:")
+            for p in pkgs
+                println("  $p")
+            end
+            println()
+
+            sort_by!(v->{v.package, v.version}, vers)
+            println("VERS (pre pruning):")
+            for v in vers
+                println("  $(v.package) $(v.version)")
+            end
+            println()
+
+            sort_by!(d->{d[1].package, d[1].version, d[2].package}, deps)
+            println("DEPS (pre pruning):")
+            for d in deps
+                println("  $(d[1].package) $(d[1].version) <- $(d[2].package) $(d[2].versions)")
+            end
+            println()
+        end
+
         np = length(pkgs)
 
         return new(reqs, pkgs, vers, deps, np)
@@ -356,6 +378,20 @@ function prune_versions!(reqsstruct::ReqsStruct, pkgstruct::PkgStruct)
 
     reqsstruct.vers = new_vers
     reqsstruct.deps = new_deps
+    if has(ENV, "PKGRESOLVE_DBG")
+        println("VERS (post pruning):")
+        for v in new_vers
+            println("  $(v.package) $(v.version)")
+        end
+        println()
+
+        sort_by!(d->{d[1].package, d[1].version, d[2].package}, deps)
+        println("DEPS (post pruning):")
+        for d in new_deps
+            println("  $(d[1].package) $(d[1].version) <- $(d[2].package) $(d[2].versions)")
+        end
+        println()
+    end
 
     # Finally, mutate pkgstruct fields by regenerating pvers, vdict
     # and vweights
@@ -379,9 +415,11 @@ function prune_versions!(reqsstruct::ReqsStruct, pkgstruct::PkgStruct)
     pkgstruct.vdict = new_vdict
     pkgstruct.vweight = new_vweight
 
-    #println("pruning stats:")
-    #println("  before: vers=$(length(vers)) deps=$(length(deps))")
-    #println("  after: vers=$(length(new_vers)) deps=$(length(new_deps))")
+    if has(ENV, "PKGRESOLVE_TEST")
+        println("pruning stats:")
+        println("  before: vers=$(length(vers)) deps=$(length(deps))")
+        println("  after: vers=$(length(new_vers)) deps=$(length(new_deps))")
+    end
 
     return reqsstruct, pkgstruct
 end
@@ -817,7 +855,9 @@ end
 # polarized packages by adding extra infinite fields on every state
 # but the maximum
 function decimate(n::Int, graph::Graph, msgs::Messages)
-    #println("DECIMATING $n NODES")
+    if has(ENV, "PKGRESOLVE_TEST")
+        println("DECIMATING $n NODES")
+    end
     fld = msgs.fld
     decimated = msgs.decimated
     fldorder = Sort.sortperm_by(secondmax, fld)[2]
@@ -852,7 +892,9 @@ function break_ties(msgs::Messages)
             end
         end
         if z > 1
-            #println("TIE! p0=$p0")
+            if has(ENV, "PKGRESOLVE_TEST")
+                println("TIE DETECTED! p0=$p0")
+            end
             decimate1(p0, msgs)
             return false
         end
@@ -872,7 +914,9 @@ function converge(graph::Graph, msgs::Messages)
         while true
             it += 1
             maxdiff = iterate(graph, msgs)
-            #println("it = $it maxdiff = $maxdiff")
+            if has(ENV, "PKGRESOLVE_TEST")
+                println("it = $it maxdiff = $maxdiff")
+            end
 
             if maxdiff == zero(FieldValue)
                 if break_ties(msgs)
@@ -918,8 +962,11 @@ function compute_output_dict(reqsstruct::ReqsStruct, pkgstruct::PkgStruct, sol::
         s = sol[p0]
         if s != spp[p0]
             v = pvers[p0][s]
-            want[p] = readchomp("METADATA/$p/versions/$v/sha1")
-            #want[p] = "$v"
+            if !has(ENV, "PKGRESOLVE_TEST")
+                want[p] = readchomp("METADATA/$p/versions/$v/sha1")
+            else
+                want[p] = "$v"
+            end
         end
     end
 
