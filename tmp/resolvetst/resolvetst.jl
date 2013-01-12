@@ -3,7 +3,14 @@ reload("alt_pkgmetadata") # overrides Metadata
 reload("pkgresolve") # needs reloading after Metadata hijacking
 
 reload("metadatagen.jl")
+#reload("metadatagen_R.jl")
 println()
+
+# Relevant environment variables:
+#  
+#  1) RUN_LINPROG : run linear programming
+#  2) PKGRESOLVE_DBG : print some debug info
+#  3) GENSEED : seed used in generators
 
 function main()
     MetadataGen.generate()
@@ -13,7 +20,7 @@ function main()
 
     ENV["PKGRESOLVE_TEST"] = true
 
-    if has(ENV, "PKGRESOLVE_DBG")
+    if get(ENV, "PKGRESOLVE_DBG", "false") == "true"
         println("REQS:")
         for r in reqs
             println("  $(r.package) $(r.versions)")
@@ -21,11 +28,13 @@ function main()
         println()
     end
 
-    println("Running Linear Programming solver")
-    println("---------------------------------")
     linprog_want = nothing
-    @time try
-        linprog_want = Metadata.resolve(reqs)
+    if get(ENV, "RUN_LINPROG", "true") == "true"
+        println("Running Linear Programming solver")
+        println("---------------------------------")
+        @time try
+            linprog_want = Metadata.resolve(reqs)
+        end
     end
 
     println()
@@ -48,7 +57,7 @@ function main()
         warn("RESULTS DIFFER")
     end
 
-    MetadataGen.clean()
+    #MetadataGen.clean()
 end
 
 main()

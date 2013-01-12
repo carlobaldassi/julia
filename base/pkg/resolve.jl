@@ -50,7 +50,7 @@ type ReqsStruct
         vers = versions(pkgs)
         deps = dependencies(pkgs,vers)
 
-        if has(ENV, "PKGRESOLVE_DBG")
+        if get(ENV, "PKGRESOLVE_DBG", "false") == "true"
             println("PKGS:")
             for p in pkgs
                 println("  $p")
@@ -378,7 +378,7 @@ function prune_versions!(reqsstruct::ReqsStruct, pkgstruct::PkgStruct)
 
     reqsstruct.vers = new_vers
     reqsstruct.deps = new_deps
-    if has(ENV, "PKGRESOLVE_DBG")
+    if get(ENV, "PKGRESOLVE_DBG", "false") == "true"
         println("VERS (post pruning):")
         for v in new_vers
             println("  $(v.package) $(v.version)")
@@ -415,7 +415,7 @@ function prune_versions!(reqsstruct::ReqsStruct, pkgstruct::PkgStruct)
     pkgstruct.vdict = new_vdict
     pkgstruct.vweight = new_vweight
 
-    if has(ENV, "PKGRESOLVE_TEST")
+    if get(ENV, "PKGRESOLVE_TEST", "false") == "true"
         println("pruning stats:")
         println("  before: vers=$(length(vers)) deps=$(length(deps))")
         println("  after: vers=$(length(new_vers)) deps=$(length(new_deps))")
@@ -855,7 +855,7 @@ end
 # polarized packages by adding extra infinite fields on every state
 # but the maximum
 function decimate(n::Int, graph::Graph, msgs::Messages)
-    if has(ENV, "PKGRESOLVE_TEST")
+    if get(ENV, "PKGRESOLVE_TEST", "false") == "true"
         println("DECIMATING $n NODES")
     end
     fld = msgs.fld
@@ -892,7 +892,7 @@ function break_ties(msgs::Messages)
             end
         end
         if z > 1
-            if has(ENV, "PKGRESOLVE_TEST")
+            if get(ENV, "PKGRESOLVE_TEST", "false") == "true"
                 println("TIE DETECTED! p0=$p0")
             end
             decimate1(p0, msgs)
@@ -914,7 +914,7 @@ function converge(graph::Graph, msgs::Messages)
         while true
             it += 1
             maxdiff = iterate(graph, msgs)
-            if has(ENV, "PKGRESOLVE_TEST")
+            if get(ENV, "PKGRESOLVE_TEST", "false") == "true"
                 println("it = $it maxdiff = $maxdiff")
             end
 
@@ -962,7 +962,7 @@ function compute_output_dict(reqsstruct::ReqsStruct, pkgstruct::PkgStruct, sol::
         s = sol[p0]
         if s != spp[p0]
             v = pvers[p0][s]
-            if !has(ENV, "PKGRESOLVE_TEST")
+            if get(ENV, "PKGRESOLVE_TEST", "false") != "true"
                 want[p] = readchomp("METADATA/$p/versions/$v/sha1")
             else
                 want[p] = "$v"
