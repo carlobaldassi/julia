@@ -1116,7 +1116,9 @@ function resolve(reqs)
     # init structures
     pkgstruct = PkgStruct(reqsstruct)
 
-    prune_versions!(reqsstruct, pkgstruct)
+    if get(ENV, "PRUNE_VERS", "true") == "true"
+        prune_versions!(reqsstruct, pkgstruct)
+    end
 
     graph = Graph(reqsstruct, pkgstruct)
     msgs = Messages(reqsstruct, pkgstruct, graph)
