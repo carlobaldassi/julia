@@ -1,7 +1,7 @@
 Instructions
 ------------
 
-Go to the directory `$JULIADIR/tmp/resolvetst` and run `reload("pkgresolvetst.jl")`.
+Go to the directory `$JULIADIR/tmp/resolvetst` and run `reload("resolvetst.jl")`.
 
 Graph generation parameters can be changed in `metadatagen.jl`.
 

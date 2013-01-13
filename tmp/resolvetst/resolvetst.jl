@@ -1,6 +1,5 @@
-require("pkg")
 reload("alt_pkgmetadata") # overrides Metadata
-reload("pkgresolve") # needs reloading after Metadata hijacking
+reload("pkg/resolve") # needs reloading after Metadata hijacking
 
 reload("metadatagen.jl")
 #reload("metadatagen_R.jl")
@@ -40,7 +39,7 @@ function main()
     println()
     println("Running MaxSum solver")
     println("---------------------")
-    @time maxsum_want = PkgResolve.resolve(reqs)
+    @time maxsum_want = Resolve.resolve(reqs)
     println()
 
     if linprog_want != nothing
