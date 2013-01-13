@@ -27,7 +27,7 @@ export generate
 rseed = int(get(ENV, "GENSEED", 1)) # random seed
 pkgn = 100                   # number of packages (remember to modify gen_pkgs "%04d" if more than 9999")
 maxver = 20                  # maximum version number (currently only major versions)
-linkprob = 0.01              # probability of linking any two packages
+linkprob = 0.005             # probability of linking any two packages
 reqprob = 0.1                # probability that a package is required
 proballv = 0.5               # probability that a VersionSet includes all versions
 problb = proballv + 0.3      # (cumulative) probability that a VersionSet is lower bounded

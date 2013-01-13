@@ -2,6 +2,7 @@ reload("alt_pkgmetadata") # overrides Metadata
 reload("pkg/resolve") # needs reloading after Metadata hijacking
 
 reload("metadatagen.jl")
+#reload("metadatagen_simple.jl")
 #reload("metadatagen_R.jl")
 println()
 
@@ -56,7 +57,7 @@ function main()
         warn("RESULTS DIFFER")
     end
 
-    #MetadataGen.clean()
+    MetadataGen.clean()
 end
 
 main()
