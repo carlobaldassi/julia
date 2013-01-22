@@ -1,5 +1,5 @@
 reload("alt_pkgmetadata") # overrides Metadata
-reload("pkg/resolve") # needs reloading after Metadata hijacking
+reload("../../base/pkg/resolve") # needs reloading after Metadata hijacking
 
 #reload("metadatagen.jl")
 #reload("metadatagen_simple.jl")

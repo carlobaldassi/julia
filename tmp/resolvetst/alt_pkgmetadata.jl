@@ -1,5 +1,5 @@
 require("linprog")
-require("git")
+require("../../base/git")
 
 module Metadata
 

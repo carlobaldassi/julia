@@ -1,4 +1,4 @@
-require("pkg")
+require("../../base/pkg")
 
 module MetadataGen
 
