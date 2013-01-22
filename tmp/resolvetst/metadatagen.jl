@@ -49,7 +49,7 @@ function gen_vers(pkgs)
 
     srand(rseed)
 
-    vern = [ randi(maxver) for i = 1:pkgn ]
+    vern = [ rand(1:maxver) for i = 1:pkgn ]
     totvern = sum(vern)
     pvers = [ Version[] for i = 1:pkgn ]
     vers = Array(Version, totvern)
@@ -78,7 +78,7 @@ function gen_deps(pkgs, pvers)
         if rand() >= linkprob
             continue
         end
-        if randi(2) == 1
+        if randbool()
             j1, j2 = p1, p2
         else
             j1, j2 = p2, p1
@@ -92,12 +92,12 @@ function gen_deps(pkgs, pvers)
             if x < proballv
                 d = (ver1, VersionSet(pkg2))
             elseif x < problb || vern[j2] == 1
-                lb2 = randi(vern[j2])
+                lb2 = rand(1:vern[j2])
                 vlb2 = pvers[j2][lb2].version
                 d = (ver1, VersionSet(pkg2, VersionNumber[vlb2]))
             elseif x < probdb || vern[j2] == 2
-                lb2 = randi(vern[j2]-1)
-                ub2 = lb2 + randi(vern[j2]-lb2)
+                lb2 = rand(1:vern[j2]-1)
+                ub2 = lb2 + rand(1:vern[j2]-lb2)
                 vlb2 = pvers[j2][lb2].version
                 vub2 = pvers[j2][ub2].version
                 d = (ver1, VersionSet(pkg2, VersionNumber[vlb2, vub2]))
@@ -133,12 +133,12 @@ function gen_reqs(pkgs, pvers)
         if x < proballv
             r = VersionSet(pkg)
         elseif x < problb || vern[p] == 1
-            lb = randi(vern[p])
+            lb = rand(1:vern[p])
             vlb = pvers[p][lb].version
             r = VersionSet(pkg, VersionNumber[vlb])
         elseif x < probdb || vern[p] == 2
-            lb = randi(vern[p]-1)
-            ub = lb + randi(vern[p]-lb)
+            lb = rand(1:vern[p]-1)
+            ub = lb + rand(1:vern[p]-lb)
             vlb = pvers[p][lb].version
             vub = pvers[p][ub].version
             r = VersionSet(pkg, VersionNumber[vlb, vub])

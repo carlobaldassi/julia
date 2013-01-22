@@ -16,7 +16,7 @@ export generate, clean
 
 rseed = int(get(ENV, "GENSEED", 1)) # random seed
 
-eot = 2000
+eot = 500
 pgen_new_pkg = 0.05
 
 pbump_major = 0.001
@@ -114,12 +114,12 @@ function generate()
         x -= pnewdep_any
         all_majmin = unique([ [v.major, v.minor] for v in pvers1 ])
         if x < pnewdep_lb
-            i = randi(length(all_majmin))
+            i = rand(1:length(all_majmin))
             return [VersionNumber(all_majmin[i]...)]
         end
         #x -= pnewdep_lb
         # double bounded
-        i = randi(length(all_majmin))
+        i = rand(1:length(all_majmin))
         vi = VersionNumber(all_majmin[i]...)
         vj = VersionNumber(vi.major+1)
         return [vi, vj]
@@ -129,7 +129,7 @@ function generate()
         pvers1 = pvers[p1]
         all_majmin = unique([ [v.major, v.minor] for v in pvers1 ])
         if isempty(prev_dep)
-            i = randi(length(all_majmin))
+            i = rand(1:length(all_majmin))
             return [VersionNumber(all_majmin[i]...)]
         elseif isodd(length(prev_dep))
             #println("prev_dep=$prev_dep")
@@ -139,7 +139,7 @@ function generate()
                 return [pd]
             elseif (pd.major, pd.minor) == (maxv.major, maxv.minor)
                 while true
-                    i = randi(length(pvers1))
+                    i = rand(1:length(pvers1))
                     vi = pvers1[i]
                     if pd < vi
                         return [vi]
@@ -147,7 +147,7 @@ function generate()
                 end
             else
                 while true
-                    i = randi(length(all_majmin))
+                    i = rand(1:length(all_majmin))
                     vi = VersionNumber(all_majmin[i]...)
                     if pd < vi
                         return [vi]
@@ -161,7 +161,7 @@ function generate()
                 return [pd, VersionNumber(pd.major+1)]
             elseif (pd.major, pd.minor) == (maxv.major, maxv.minor)
                 while true
-                    i = randi(length(pvers1))
+                    i = rand(1:length(pvers1))
                     vi = pvers1[i]
                     if pd < vi
                         return [vi, VersionNumber(vi.major+1)]
@@ -169,7 +169,7 @@ function generate()
                 end
             else
                 while true
-                    i = randi(length(all_majmin))
+                    i = rand(1:length(all_majmin))
                     vi = VersionNumber(all_majmin[i]...)
                     if pd < vi
                         return [vi, VersionNumber(vi.major+1)]
@@ -254,7 +254,7 @@ function generate()
         pvers0 = pvers[p0]
         all_majmin = unique([ [v.major, v.minor] for v in pvers0 ])
         if x < preq_lb
-            i = randi(length(all_majmin))
+            i = rand(1:length(all_majmin))
             vi = VersionNumber(all_majmin[i]...)
             r = VersionSet(p, [vi])
             push!(reqs, r)
@@ -262,7 +262,7 @@ function generate()
         end
         x -= preq_lb
         # double bounded
-        i = randi(length(all_majmin))
+        i = rand(1:length(all_majmin))
         vi = VersionNumber(all_majmin[i]...)
         vj = VersionNumber(vi.major+1)
         r = VersionSet(p, [vi, vj])
