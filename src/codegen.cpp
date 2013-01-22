@@ -34,6 +34,9 @@
 #include "llvm/Support/DynamicLibrary.h"
 #include "llvm/Config/llvm-config.h"
 #include <setjmp.h>
+#ifdef __WIN32__
+#include <malloc.h>
+#endif
 #include <string>
 #include <sstream>
 #include <map>
@@ -1516,6 +1519,8 @@ static Value *emit_expr(jl_value_t *expr, jl_codectx_t *ctx, bool isboxed,
         return NULL;
     }
     else if (jl_is_linenode(expr)) {
+        if(valuepos)
+            jl_error("Linenode in value position");
         return NULL;
     }
     else if (jl_is_quotenode(expr)) {
@@ -1953,8 +1958,9 @@ static Function *emit_function(jl_lambda_info_t *lam)
             lam->functionObject = (void*)f;
         }
     }
-    if (jlrettype == (jl_value_t*)jl_bottom_type)
-        f->setDoesNotReturn();
+    //TODO: this seems to cause problems, but should be made to work eventually
+    //if (jlrettype == (jl_value_t*)jl_bottom_type)
+    //    f->setDoesNotReturn();
 
     ctx.f = f;
 

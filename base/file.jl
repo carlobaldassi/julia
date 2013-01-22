@@ -8,7 +8,11 @@ function pwd()
     bytestring(p)
 end
 
-cd(dir::String) = system_error(:chdir, ccall(:chdir,Int32,(Ptr{Uint8},),dir) == -1)
+
+function cd(dir::String) 
+	@windows_only system_error(:_chdir, ccall(:_chdir,Int32,(Ptr{Uint8},),dir) == -1)
+	@unix_only system_error(:chdir, ccall(:chdir,Int32,(Ptr{Uint8},),dir) == -1)
+end
 cd() = cd(ENV["HOME"])
 
 # do stuff in a directory, then return to current directory
@@ -22,6 +26,7 @@ function cd(f::Function, dir::String)
         f()
     finally
         system_error(:fchdir, ccall(:fchdir,Int32,(Int32,),fd) != 0)
+        system_error(:close, ccall(:close,Int32,(Int32,),fd) != 0)
     end
 end
 end
@@ -50,6 +55,19 @@ function mkdir(path::String, mode::Unsigned)
 end
 mkdir(path::String, mode::Signed) = error("mkdir: mode must be an unsigned integer -- perhaps 0o", mode, "?")
 mkdir(path::String) = mkdir(path, 0o777)
+function mkpath(path::String, mode)
+    dparts = splitdrive(path)
+	path = dparts[1]
+	@windows_only path *= "\\"
+	parts = (split(dparts[2],Base.path_separator_re,false))
+	for x in parts
+		path=joinpath(path,x)
+		if(!isdir(path))
+			mkdir(path,mode)
+		end
+	end
+end
+mkpath(path::String) = mkpath(path,0o777)
 
 function rmdir(path::String)
     @unix_only ret = ccall(:rmdir, Int32, (Ptr{Uint8},), bytestring(path))
@@ -150,7 +168,7 @@ function download_file(url::String, filename::String)
     if downloadcmd == :wget
         run(`wget -O $filename $url`)
     elseif downloadcmd == :curl
-        run(`curl -o $filename $url`)
+        run(`curl -o $filename -L $url`)
     elseif downloadcmd == :fetch
         run(`fetch -f $filename $url`)
     else

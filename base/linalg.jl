@@ -76,7 +76,7 @@ norm(A::AbstractMatrix) = norm(A, 2)
 norm(x::Number) = abs(x)
 norm(x::Number, p) = abs(x)
 
-normfro(A::AbstractMatrix) = norm(reshape(A, length(A)), 2)
+normfro(A::AbstractMatrix) = norm(reshape(A, length(A)))
 normfro(x::Number) = abs(x)
 
 rank(A::AbstractMatrix, tol::Real) = sum(svdvals(A) .> tol)
@@ -84,7 +84,7 @@ function rank(A::AbstractMatrix)
     m,n = size(A)
     if m == 0 || n == 0; return 0; end
     sv = svdvals(A)
-    sum(sv .> max(size(A,1),size(A,2))*eps(sv[1]))
+    sum(sv .> max(size(A))*eps(sv[1]))
 end
 rank(x::Number) = x == 0 ? 0 : 1
 

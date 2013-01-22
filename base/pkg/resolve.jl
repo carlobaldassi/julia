@@ -1170,7 +1170,7 @@ function enforce_optimality(reqsstruct::ReqsStruct, pkgstruct::PkgStruct, sol::V
                 continue
             end
             # So the solution is non-optimal: we bump it manually
-            #println(stderr_stream, "Warning: nonoptimal solution for package $(reqsstruct.pkgs[p0]): sol=$s0")
+            #println(STDERR, "Warning: nonoptimal solution for package $(reqsstruct.pkgs[p0]): sol=$s0")
             sol[p0] += 1
             restart = true
         end

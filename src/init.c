@@ -97,9 +97,6 @@ void fpe_handler(int arg)
 void segv_handler(int sig, siginfo_t *info, void *context)
 {
     sigset_t sset;
-    sigemptyset(&sset);
-    sigaddset(&sset, SIGSEGV);
-    sigprocmask(SIG_UNBLOCK, &sset, NULL);
 
     if (
 #ifdef COPY_STACKS
@@ -111,10 +108,20 @@ void segv_handler(int sig, siginfo_t *info, void *context)
         (char*)jl_current_task->stack+jl_current_task->ssize
 #endif
         ) {
+        sigemptyset(&sset);
+        sigaddset(&sset, SIGSEGV);
+        sigprocmask(SIG_UNBLOCK, &sset, NULL);
         jl_throw(jl_stackovf_exception);
     }
     else {
-        signal(SIGSEGV, SIG_DFL);
+        uv_tty_reset_mode();
+        sigfillset(&sset);
+        sigprocmask(SIG_UNBLOCK, &sset, NULL);
+        signal(sig, SIG_DFL);
+        if (sig != SIGSEGV &&
+            sig != SIGBUS &&
+            sig != SIGILL)
+            raise(sig);
     }
 }
 
@@ -194,7 +201,7 @@ struct uv_shutdown_queue_item { uv_handle_t *h; struct uv_shutdown_queue_item *n
 struct uv_shutdown_queue { struct uv_shutdown_queue_item *first; struct uv_shutdown_queue_item *last; };
 static void jl_shutdown_uv_cb(uv_shutdown_t* req, int status)
 {
-    if (status == 0) uv_close((uv_handle_t*)req->handle,NULL); //doesn't appear to be necessary...
+    if (status == 0) jl_close_uv((uv_handle_t*)req->handle);
     free(req);
 }
 static void jl_uv_exitcleanup_walk(uv_handle_t* handle, void *arg)
@@ -207,7 +214,7 @@ static void jl_uv_exitcleanup_walk(uv_handle_t* handle, void *arg)
     if (!queue->first) queue->first = item;
     queue->last = item;
 }
-void jl_atexit_hook()
+DLLEXPORT void uv_atexit_hook()
 {
     if (jl_base_module) {
         jl_value_t *f = jl_get_global(jl_base_module, jl_symbol("_atexit"));
@@ -222,44 +229,44 @@ void jl_atexit_hook()
     while (item) {
         uv_handle_t *handle = item->h;
         switch(handle->type) {
-            case UV_TTY:
-            case UV_UDP:
-//#ifndef __WIN32__ // unix only supports shutdown on TCP and NAMED_PIPE
+        case UV_TTY:
+        case UV_UDP:
+            //#ifndef __WIN32__ // unix only supports shutdown on TCP and NAMED_PIPE
 // but uv_shutdown doesn't seem to be particularly reliable, so we'll avoid it in general
-                uv_close(handle,NULL);
-                break;
+            jl_close_uv(handle);
+            break;
 //#endif
-            case UV_TCP:
-            case UV_NAMED_PIPE:
-                if (uv_is_writable((uv_stream_t*)handle)) { // uv_shutdown returns an error if not writable
-                    uv_shutdown_t *req = malloc(sizeof(uv_shutdown_t));
-                    int err = uv_shutdown(req, (uv_stream_t*)handle, jl_shutdown_uv_cb);
-                    if (err != 0) { printf("shutdown err: %s\n", uv_strerror(uv_last_error(jl_global_event_loop())));}
-                }
-                else {
-                    uv_close(handle,NULL);
-                }
-                break;
-            case UV_POLL:
-            case UV_TIMER:
-            case UV_PREPARE:
-            case UV_CHECK:
-            case UV_IDLE:
-            case UV_ASYNC:
-            case UV_SIGNAL:
-            case UV_PROCESS:
-            case UV_FS_EVENT:
-            case UV_FS_POLL:
-                uv_close(handle,NULL); //do we want to use jl_close_uv?
-                break;
-            case UV_HANDLE:
-            case UV_STREAM:
-            case UV_UNKNOWN_HANDLE:
-            case UV_HANDLE_TYPE_MAX:
-            case UV_RAW_FD:
-            case UV_RAW_HANDLE:
-            default:
-                assert(0);
+        case UV_TCP:
+        case UV_NAMED_PIPE:
+            if (uv_is_writable((uv_stream_t*)handle)) { // uv_shutdown returns an error if not writable
+                uv_shutdown_t *req = malloc(sizeof(uv_shutdown_t));
+                int err = uv_shutdown(req, (uv_stream_t*)handle, jl_shutdown_uv_cb);
+                if (err != 0) { printf("shutdown err: %s\n", uv_strerror(uv_last_error(jl_global_event_loop())));}
+            }
+            else {
+                jl_close_uv(handle);
+            }
+            break;
+        case UV_POLL:
+        case UV_TIMER:
+        case UV_PREPARE:
+        case UV_CHECK:
+        case UV_IDLE:
+        case UV_ASYNC:
+        case UV_SIGNAL:
+        case UV_PROCESS:
+        case UV_FS_EVENT:
+        case UV_FS_POLL:
+            uv_close(handle,NULL); //do we want to use jl_close_uv?
+            break;
+        case UV_HANDLE:
+        case UV_STREAM:
+        case UV_UNKNOWN_HANDLE:
+        case UV_HANDLE_TYPE_MAX:
+        case UV_RAW_FD:
+        case UV_RAW_HANDLE:
+        default:
+            assert(0);
         }
         item = item->next;
     }
@@ -317,7 +324,7 @@ void *init_stdio_handle(uv_file fd,int readable)
             handle = malloc(sizeof(uv_tty_t));
             uv_tty_init(jl_io_loop,(uv_tty_t*)handle,fd,readable);
             ((uv_tty_t*)handle)->data=0;
-            uv_tty_set_mode((void*)handle,1); //raw stdio
+            uv_tty_set_mode((void*)handle,0); //cooked stdio
             break;
         case UV_NAMED_PIPE:
         case UV_FILE:
@@ -469,8 +476,6 @@ void julia_init(char *imageFile)
         jl_exit(1);
     }
 #endif
-
-    //atexit(jl_atexit_hook);
 
 #ifdef JL_GC_MARKSWEEP
     jl_gc_enable();

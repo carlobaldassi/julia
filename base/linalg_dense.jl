@@ -582,15 +582,6 @@ function det{T}(lu::LUDense{T})
     prod(diag(lu.lu)) * (bool(sum(lu.ipiv .!= 1:n) % 2) ? -one(T) : one(T))
 end
 
-function det(A::Matrix)
-    m, n = size(A)
-    if m != n; error("det only defined for square matrices"); end
-    if istriu(A) | istril(A); return prod(diag(A)); end
-    return det(lud(A))
-end
-
-det(x::Number) = x
-
 function (\){T<:BlasFloat}(lu::LUDense{T}, B::StridedVecOrMat{T})
     if lu.info > 0; throw(LAPACK.SingularException(info)); end
     LAPACK.getrs!('N', lu.lu, lu.ipiv, copy(B))
@@ -684,6 +675,43 @@ function (\){T<:BlasFloat}(A::QRPDense{T}, B::StridedVecOrMat{T})
     isa(B, Vector) ? x[invperm(A.jpvt)] : x[:,invperm(A.jpvt)]
 end
 
+##TODO:  Add methods for rank(A::QRP{T}) and adjust the (\) method accordingly
+##       Add rcond methods for Cholesky, LU, QR and QRP types
+## Lower priority: Add LQ, QL and RQ factorizations
+
+# FIXME! Should add balancing option through xgebal
+type Hessenberg{T} <: Factorization{T}
+    H::Matrix{T}
+    tau::Vector{T}
+    ilo::Int
+    ihi::Int
+end
+function hessfact(A::StridedMatrix)
+    tmp = LAPACK.gehrd!(copy(A))
+    return Hessenberg(tmp[1], tmp[2], 1, size(A, 1))
+end
+function factors(H::Hessenberg) 
+    A = copy(H.H)
+    n = size(A, 1)
+    for j = 1:n-2
+        for i = j+2:n
+            A[i,j] = zero(A[1])
+        end
+    end
+    return (A, LAPACK.orghr!(H.ilo, H.ihi, H.H, H.tau))
+end
+hess(A::StridedMatrix) = factors(hessfact(A))[1]
+
+### Linear algebra for general matrices
+
+function det(A::Matrix)
+    m, n = size(A)
+    if m != n; error("det only defined for square matrices"); end
+    if istriu(A) | istril(A); return prod(diag(A)); end
+    return det(lud(A))
+end
+det(x::Number) = x
+
 function eig{T<:BlasFloat}(A::StridedMatrix{T}, vecs::Bool)
     n = size(A, 2)
     if n == 0; return vecs ? (zeros(T, 0), zeros(T, 0, 0)) : zeros(T, 0, 0); end
@@ -753,7 +781,7 @@ eigvals(x) = eig(x, false)
 # svdvals(A) = svd(A,false,true)[2]
 
 svdt(x::Number,vecs::Bool,thin::Bool) = vecs ? (x==0?one(x):x/abs(x),abs(x),one(x)) : ([],abs(x),[])
-svd(x::Number,vecs::Bool,thin::Bool) = svdt(x, vecs, thin)
+svdt(x::Number,vecs::Bool,thin::Bool) = svdt(x, vecs, thin)
 
 function svdt{T<:BlasFloat}(A::StridedMatrix{T},vecs::Bool,thin::Bool)
     m,n = size(A)
@@ -771,7 +799,7 @@ svdt(A, thin::Bool) = svdt(A,true,thin)
 
 svdt(x::Number,vecs::Bool,thin::Bool) = vecs ? (x==0?one(x):x/abs(x),abs(x),one(x)) : ([],abs(x),[])
 
-function svd(x::StridedMatrix,vecs,thin) 
+function svd(x::StridedMatrix,vecs::Bool,thin::Bool) 
     (u, s, vt) = svdt(x,vecs,thin)
     return (u, s, vt')
 end
@@ -781,6 +809,50 @@ svd(A, thin::Bool) = svd(A,true,thin)
 
 svdvals(A) = svdt(A,false,true)[2]
 
+schur{T<:BlasFloat}(A::StridedMatrix{T}) = LAPACK.gees!('V', copy(A))
+
+function sqrtm(A::Matrix, cond::Bool)
+    m, n = size(A)
+    if m != n error("DimentionMismatch") end
+    if ishermitian(A)
+        z = similar(A)
+        v = LAPACK.syevr!(copy(A),z)
+        vsqrt = sqrt(complex(v))
+        if all(imag(vsqrt) .== 0)
+            retmat = symmetrize!(diagmm(z, real(vsqrt)) * z')
+        else
+            zc = complex(z)
+            retmat = symmetrize!(diagmm(zc, vsqrt) * zc')
+        end
+        if cond
+            return retmat, norm(vsqrt, Inf)^2/norm(v, Inf)
+        else
+            return retmat
+        end
+    else
+        T,Q,_ = schur(complex(A))
+        R = zeros(eltype(T), n, n)
+        for j = 1:n
+            R[j,j] = sqrt(T[j,j])
+            for i = j - 1:-1:1
+                r = zero(A[1])
+                for k = i + 1:j - 1
+                    r += R[i,k]*R[k,j]
+                end
+                R[i,j] = (T[i,j] - r) / (R[i,i] + R[j,j])
+            end
+        end
+        retmat = Q*R*Q'
+        if cond
+            alpha = norm(R)^2/norm(T)
+            return (all(imag(retmat) .== 0) ? real(retmat) : retmat), alpha
+        else
+            return (all(imag(retmat) .== 0) ? real(retmat) : retmat)
+        end
+    end
+end
+sqrtm(A::Matrix) = sqrtm(A, false)
+sqrtm(a::Number) = isreal(a) ? (b = sqrt(complex(a)); imag(b) == 0 ? real(b) : b)  : sqrt(a)
 
 function (\){T<:BlasFloat}(A::StridedMatrix{T}, B::StridedVecOrMat{T})
     Acopy = copy(A)
@@ -819,13 +891,9 @@ end
 
 (/)(A::StridedVecOrMat, B::StridedVecOrMat) = (B' \ A')'
 
-##TODO:  Add methods for rank(A::QRP{T}) and adjust the (\) method accordingly
-##       Add rcond methods for Cholesky, LU, QR and QRP types
-## Lower priority: Add LQ, QL and RQ factorizations
-
 ## Moore-Penrose inverse
 function pinv{T<:BlasFloat}(A::StridedMatrix{T})
-    u,s,vt      = svd(A, true)
+    u,s,vt      = svdt(A, true)
     sinv        = zeros(T, length(s))
     index       = s .> eps(real(one(T)))*max(size(A))*max(s)
     sinv[index] = 1 ./ s[index]
@@ -838,7 +906,7 @@ pinv(x::Number) = one(x)/x
 ## Basis for null space
 function null{T<:BlasFloat}(A::StridedMatrix{T})
     m,n = size(A)
-    _,s,vt = svd(A)
+    _,s,vt = svdt(A)
     if m == 0; return eye(T, n); end
     indstart = sum(s .> max(m,n)*max(s)*eps(eltype(s))) + 1
     vt[indstart:,:]'
@@ -892,7 +960,7 @@ function full(S::SymTridiagonal)
     M
 end
 
-function show(io, S::SymTridiagonal)
+function show(io::IO, S::SymTridiagonal)
     println(io, summary(S), ":")
     print(io, "diag: ")
     print_matrix(io, (S.dv)')
@@ -940,7 +1008,7 @@ function Tridiagonal{Tl<:Number, Td<:Number, Tu<:Number}(dl::Vector{Tl}, d::Vect
 end
 
 size(M::Tridiagonal) = (length(M.d), length(M.d))
-function show(io, M::Tridiagonal)
+function show(io::IO, M::Tridiagonal)
     println(io, summary(M), ":")
     print(io, " sub: ")
     print_matrix(io, (M.dl)')
@@ -1203,7 +1271,7 @@ Woodbury{T}(A::AbstractMatrix{T}, U::Matrix{T}, C, V::Matrix{T}) = Woodbury{T}(A
 Woodbury{T}(A::AbstractMatrix{T}, U::Vector{T}, C, V::Matrix{T}) = Woodbury{T}(A, reshape(U, length(U), 1), C, V)
 
 size(W::Woodbury) = size(W.A)
-function show(io, W::Woodbury)
+function show(io::IO, W::Woodbury)
     println(io, summary(W), ":")
     print(io, "A: ", W.A)
     print(io, "\nU:\n")

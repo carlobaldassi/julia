@@ -5,14 +5,14 @@ eval(m,x) = Core.eval(m,x)
 
 include = Core.include
 
-include("export.jl")
+include("exports.jl")
 
 if false
     # simple print definitions for debugging. enable these if something
     # goes wrong during bootstrap before printing code is available.
     length(a::Array) = arraylen(a)
-    print(x) = print(stdout_stream, x)
-    show(x) = show(stdout_stream, x)
+    print(x) = print(STDOUT, x)
+    show(x) = show(STDOUT, x)
     write(io, a::Array{Uint8,1}) =
         ccall(:ios_write, Uint, (Ptr{Void}, Ptr{Void}, Uint),
               io.ios, a, length(a))
@@ -81,7 +81,7 @@ include("io.jl")
 include("iostring.jl")
 include("stream.jl")
 include("fs.jl")
-using FS
+importall FS
 include("process.jl")
 ccall(:jl_get_uv_hooks, Void, ())
 include("char.jl")
@@ -93,7 +93,7 @@ include("show.jl")
 include("grisu.jl")
 import Grisu.print_shortest
 include("printf.jl")
-using Printf
+importall Printf
 
 # concurrency and parallelism
 include("iterator.jl")
@@ -111,24 +111,25 @@ include("file.jl")
 include("path.jl")
 include("stat.jl")
 
-# front end
+# front end & code loading
 include("client.jl")
+include("loading.jl")
 
 # core math functions
 include("intfuncs.jl")
 include("floatfuncs.jl")
 include("math.jl")
-using Math
+importall Math
 
 # random number generation and statistics
 include("statistics.jl")
 include("librandom.jl")
 include("rng.jl")
-using RNG
+importall RNG
 
 # Combinatorics
 include("sort.jl")
-using Sort
+importall Sort
 include("combinatorics.jl")
 
 # distributed arrays and memory-mapped arrays
@@ -138,9 +139,10 @@ include("mmap.jl")
 
 # utilities - version, timing, help, edit
 include("version.jl")
-include("util.jl")
 include("datafmt.jl")
 include("deepcopy.jl")
+include("util.jl")
+include("test.jl")
 
 # linear algebra
 include("blas.jl")
@@ -155,7 +157,7 @@ include("linalg_sparse.jl")
 # signal processing
 include("fftw.jl")
 include("dsp.jl")
-using DSP
+importall DSP
 
 # deprecated functions
 include("deprecated.jl")
@@ -235,7 +237,6 @@ compile_hint(hash, (Int,))
 compile_hint(isequal, (Symbol, Symbol))
 compile_hint(isequal, (Bool, Bool))
 compile_hint(WaitFor, (Symbol, RemoteRef))
-compile_hint(answer_color, ())
 compile_hint(get, (EnvHash, ASCIIString, ASCIIString))
 compile_hint(notify_empty, (WorkItem,))
 compile_hint(rr2id, (RemoteRef,))
