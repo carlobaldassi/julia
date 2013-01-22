@@ -1,9 +1,11 @@
 reload("alt_pkgmetadata") # overrides Metadata
 reload("pkg/resolve") # needs reloading after Metadata hijacking
 
-reload("metadatagen.jl")
+#reload("metadatagen.jl")
 #reload("metadatagen_simple.jl")
 #reload("metadatagen_R.jl")
+reload("metadatagen_R-grow.jl")
+#reload("metadatagen_R-tst.jl")
 println()
 
 # Relevant environment variables:
@@ -14,6 +16,13 @@ println()
 
 function main()
     MetadataGen.generate()
+
+    println("SEED = ", ENV["GENSEED"])
+    println("PKGS = ", countlines("pkgs.txt"))
+    println("REQS = ", countlines("reqs.txt"))
+    println("VERS = ", countlines("vers.txt"))
+    println("DEPS = ", countlines("deps.txt"))
+    println()
 
     reqs = Metadata.parse_requires("reqs.txt")
     sort!(reqs)
@@ -35,9 +44,9 @@ function main()
         @time try
             linprog_want = Metadata.resolve(reqs)
         end
+        println()
     end
 
-    println()
     println("Running MaxSum solver")
     println("---------------------")
     @time maxsum_want = Resolve.resolve(reqs)

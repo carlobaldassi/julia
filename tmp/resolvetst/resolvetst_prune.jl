@@ -1,15 +1,15 @@
 reload("alt_pkgmetadata") # overrides Metadata
 reload("pkg/resolve") # needs reloading after Metadata hijacking
 
-reload("metadatagen.jl")
+#reload("metadatagen.jl")
 #reload("metadatagen_R.jl")
+reload("metadatagen_R-grow.jl")
 println()
 
 # Relevant environment variables:
 #
-#  1) RUN_LINPROG : run linear programming
-#  2) PKGRESOLVE_DBG : print some debug info
-#  3) GENSEED : seed used in generators
+#  1) PKGRESOLVE_DBG : print some debug info
+#  2) GENSEED : seed used in generators
 
 function main()
     MetadataGen.generate()
