@@ -27,15 +27,21 @@ function main()
     reqs = Metadata.parse_requires("reqs.txt")
     sort!(reqs)
 
-    ENV["PKGRESOLVE_TEST"] = true
+    Resolve.@pkgres_testing_set "true"
 
-    if get(ENV, "PKGRESOLVE_DBG", "false") == "true"
+    Resolve.@pkgres_dbg begin
         println("REQS:")
         for r in reqs
             println("  $(r.package) $(r.versions)")
         end
         println()
     end
+
+    println("Sanity check")
+    println("------------")
+    @time Resolve.sanity_check()
+    println("ok")
+    println()
 
     linprog_want = nothing
     if get(ENV, "RUN_LINPROG", "true") == "true"

@@ -10,7 +10,51 @@ import Base.<, Base.<=, Base.==, Base.-, Base.+,
        Base.zero, Base.isless, Base.abs, Base.typemin, Base.typemax,
        Base.indmax
 
-export resolve
+export resolve, @pkgres_dbg, @pkgres_testing_set
+
+macro pkgres_dbg(expr)
+    quote
+        if get(ENV, "PKGRESOLVE_DBG", "false") == "true"
+            $(esc(expr))
+        end
+    end
+end
+macro pkgres_testing(expr)
+    quote
+        if get(ENV, "PKGRESOLVE_TEST", "false") == "true"
+            $(esc(expr))
+        end
+    end
+end
+macro pkgres_nontesting(expr)
+    quote
+        if get(ENV, "PKGRESOLVE_TEST", "false") == "false"
+            $(esc(expr))
+        end
+    end
+end
+macro pkgres_testing_println(expr)
+    quote
+        @pkgres_testing println($(esc(expr)))
+    end
+end
+macro pkgres_testing_stash()
+    quote
+        let PRT = get(ENV, "PKGRESOLVE_TEST", "nothing")
+            ENV["PKGRESOLVE_TEST"] = "false"
+            PRT
+        end
+    end
+end
+macro pkgres_testing_set(PRT)
+    quote
+        if $(esc(PRT)) != "nothing"
+            ENV["PKGRESOLVE_TEST"] = $(esc(PRT))
+        else
+            delete!(ENV, "PKGRESOLVE_TST", nothing)
+        end
+    end
+end
 
 # An exception type used internally to signal that an unsatisfiable
 # constraint was detected
@@ -45,37 +89,43 @@ type ReqsStruct
     deps::Vector{(Version,VersionSet)}
     np::Int
 
-    function ReqsStruct(reqs::Vector{VersionSet})
-        pkgs = packages()
-        vers = versions(pkgs)
-        deps = dependencies(pkgs,vers)
+    ReqsStruct(reqs::Vector{VersionSet},
+               pkgs::Vector{String},
+               vers::Vector{Version},
+               deps::Vector{(Version,VersionSet)}) =
+        new(reqs, pkgs, vers, deps, length(pkgs))
 
-        if get(ENV, "PKGRESOLVE_DBG", "false") == "true"
-            println("PKGS:")
-            for p in pkgs
-                println("  $p")
-            end
-            println()
 
-            sort_by!(v->{v.package, v.version}, vers)
-            println("VERS (pre pruning):")
-            for v in vers
-                println("  $(v.package) $(v.version)")
-            end
-            println()
+end
 
-            sort_by!(d->{d[1].package, d[1].version, d[2].package}, deps)
-            println("DEPS (pre pruning):")
-            for d in deps
-                println("  $(d[1].package) $(d[1].version) <- $(d[2].package) $(d[2].versions)")
-            end
-            println()
+function ReqsStruct(reqs::Vector{VersionSet})
+    pkgs = packages()
+    vers = versions(pkgs)
+    deps = dependencies(pkgs,vers)
+
+    @pkgres_dbg begin
+        println("PKGS:")
+        for p in pkgs
+            println("  $p")
         end
+        println()
 
-        np = length(pkgs)
+        sort_by!(v->{v.package, v.version}, vers)
+        println("VERS (pre pruning):")
+        for v in vers
+            println("  $(v.package) $(v.version)")
+        end
+        println()
 
-        return new(reqs, pkgs, vers, deps, np)
+        sort_by!(d->{d[1].package, d[1].version, d[2].package}, deps)
+        println("DEPS (pre pruning):")
+        for d in deps
+            println("  $(d[1].package) $(d[1].version) <- $(d[2].package) $(d[2].versions)")
+        end
+        println()
     end
+
+    return ReqsStruct(reqs, pkgs, vers, deps)
 end
 
 # The numeric type used to determine how the different
@@ -194,7 +244,8 @@ end
 # Also, for each package explicitly required, dicards all versions outside
 # the allowed range (checking for impossible ranges while at it).
 # This function mutates both input structs.
-function prune_versions!(reqsstruct::ReqsStruct, pkgstruct::PkgStruct)
+prune_versions!(reqsstruct::ReqsStruct, pkgstruct::PkgStruct) = prune_versions!(reqsstruct, pkgstruct, true)
+function prune_versions!(reqsstruct::ReqsStruct, pkgstruct::PkgStruct, prune_reqs::Bool)
 
     np = reqsstruct.np
     reqs = reqsstruct.reqs
@@ -222,20 +273,22 @@ function prune_versions!(reqsstruct::ReqsStruct, pkgstruct::PkgStruct)
 
     # Parse requirements and store allowed versions.
     allowed = [ trues(spp[p0]-1) for p0 = 1:np ]
-    for r in reqs
-        p = r.package
-        p0 = pdict[p]
-        pvers0 = pvers[p0]
-        allowed0 = allowed[p0]
-        for v0 = 1:spp[p0]-1
-            v = pvers0[v0]
-            allowed0[v0] = contains(r, Version(p, v))
+    if prune_reqs
+        for r in reqs
+            p = r.package
+            p0 = pdict[p]
+            pvers0 = pvers[p0]
+            allowed0 = allowed[p0]
+            for v0 = 1:spp[p0]-1
+                v = pvers0[v0]
+                allowed0[v0] = contains(r, Version(p, v))
+            end
         end
-    end
-    for p0 = 1:np
-        allowed0 = allowed[p0]
-        if !any(allowed0)
-            error("Invalid requirements: no version allowed for package $(pkgs[p0])")
+        for p0 = 1:np
+            allowed0 = allowed[p0]
+            if !any(allowed0)
+                error("Invalid requirements: no version allowed for package $(pkgs[p0])")
+            end
         end
     end
 
@@ -332,6 +385,7 @@ function prune_versions!(reqsstruct::ReqsStruct, pkgstruct::PkgStruct)
     # At this point, the vmask patterns are computed. We divide them into
     # classes so that we can keep just one version for each class.
     pruned_vers_id = [ Int[] for p0 = 1:np ]
+    eq_classes_map = [ (VersionNumber=>VersionNumber)[] for p0 = 1:np ]
     for p0 = 1:np
         vmask0 = vmask[p0]
         vmask0_uniq = unique(vmask0)
@@ -349,9 +403,16 @@ function prune_versions!(reqsstruct::ReqsStruct, pkgstruct::PkgStruct)
         # For each nonempty class, we store only the last entry (i.e. the
         # highest version)
         pruned0 = pruned_vers_id[p0]
+        eqclass0 = eq_classes_map[p0]
+        pvers0 = pvers[p0]
         for cl in classes
             if !isempty(cl)
-                push!(pruned0, cl[end])
+                vtop0 = cl[end]
+                push!(pruned0, vtop0)
+                vtop = pvers0[vtop0]
+                for v0 in cl
+                    eqclass0[pvers0[v0]] = vtop
+                end
             end
         end
         sort!(pruned0)
@@ -387,7 +448,7 @@ function prune_versions!(reqsstruct::ReqsStruct, pkgstruct::PkgStruct)
     reqsstruct.vers = new_vers
     reqsstruct.deps = new_deps
 
-    if get(ENV, "PKGRESOLVE_DBG", "false") == "true"
+    @pkgres_dbg begin
         println("VERS (post pruning):")
         for v in new_vers
             println("  $(v.package) $(v.version)")
@@ -423,15 +484,17 @@ function prune_versions!(reqsstruct::ReqsStruct, pkgstruct::PkgStruct)
     pkgstruct.pvers = new_pvers
     pkgstruct.vdict = new_vdict
     pkgstruct.vweight = new_vweight
-    pkgstruct.waspruned = true
+    if prune_reqs
+        pkgstruct.waspruned = true
+    end
 
-    if get(ENV, "PKGRESOLVE_TEST", "false") == "true"
+    @pkgres_testing begin
         println("pruning stats:")
         println("  before: vers=$(length(vers)) deps=$(length(deps))")
         println("  after: vers=$(length(new_vers)) deps=$(length(new_deps))")
     end
 
-    return reqsstruct, pkgstruct
+    return eq_classes_map
 end
 
 # FieldValue is a numeric type which helps dealing with
@@ -919,9 +982,7 @@ end
 # polarized packages by adding extra infinite fields on every state
 # but the maximum
 function decimate(n::Int, graph::Graph, msgs::Messages)
-    if get(ENV, "PKGRESOLVE_TEST", "false") == "true"
-        println("DECIMATING $n NODES")
-    end
+    @pkgres_testing_println("DECIMATING $n NODES")
     fld = msgs.fld
     decimated = msgs.decimated
     fldorder = Sort.sortperm_by(secondmax, fld)[2]
@@ -956,9 +1017,7 @@ function break_ties(msgs::Messages)
             end
         end
         if z > 1
-            if get(ENV, "PKGRESOLVE_TEST", "false") == "true"
-                println("TIE DETECTED! p0=$p0")
-            end
+            @pkgres_testing_println("TIE DETECTED! p0=$p0")
             decimate1(p0, msgs)
             return false
         end
@@ -977,9 +1036,7 @@ function converge(graph::Graph, msgs::Messages)
     while true
         it += 1
         maxdiff = iterate(graph, msgs)
-        if get(ENV, "PKGRESOLVE_TEST", "false") == "true"
-            println("it = $it maxdiff = $maxdiff")
-        end
+        @pkgres_testing_println("it = $it maxdiff = $maxdiff")
 
         if maxdiff == zero(FieldValue)
             if break_ties(msgs)
@@ -1023,11 +1080,8 @@ function compute_output_dict(reqsstruct::ReqsStruct, pkgstruct::PkgStruct, sol::
         s = sol[p0]
         if s != spp[p0]
             v = pvers[p0][s]
-            if get(ENV, "PKGRESOLVE_TEST", "false") != "true"
-                want[p] = readchomp("METADATA/$p/versions/$v/sha1")
-            else
-                want[p] = "$v"
-            end
+            @pkgres_nontesting want[p] = readchomp("METADATA/$p/versions/$v/sha1")
+            @pkgres_testing    want[p] = "$v"
         end
     end
 
@@ -1215,6 +1269,219 @@ function resolve(reqs)
 
     # return the solution as a Dict mapping package_name => sha1
     return compute_output_dict(reqsstruct, pkgstruct, sol)
+end
+
+function substructs(reqsstruct0::ReqsStruct, pkgstruct0::PkgStruct, pdeps::Vector, v::Version)
+
+    pkgs = reqsstruct0.pkgs
+    vers = reqsstruct0.vers
+    deps = reqsstruct0.deps
+    np = reqsstruct0.np
+    spp = pkgstruct0.spp
+    pdict = pkgstruct0.pdict
+    pvers = pkgstruct0.pvers
+    vdict = pkgstruct0.vdict
+
+    p = v.package
+    vn = v.version
+    nvn = deepcopy(vn)
+    nvn.patch += 1
+    reqs = [VersionSet(p, [vn, nvn])]
+
+    p0 = pdict[p]
+    staged = IntSet(p0)
+    pset = IntSet(p0)
+    while !isempty(staged)
+        staged_next = IntSet()
+        for p0 in staged
+            for w in pdeps[p0], vs in w
+                p1 = pdict[vs.package]
+                add(staged_next, p1)
+            end
+        end
+        pset = union(pset, staged_next)
+        staged = staged_next
+    end
+
+    red_pkgs = [ pkgs[p0] for p0 in pset ]
+    red_vers = Version[]
+    for p0 in pset
+        pvers0 = pvers[p0]
+        for vn in pvers0
+            push!(red_vers, Version(pkgs[p0], vn))
+        end
+    end
+    red_deps = Array((Version,VersionSet),0)
+    for p0 in pset
+        pdeps0 = pdeps[p0]
+        pvers0 = pvers[p0]
+        p = pkgs[p0]
+        for v0 = 1:spp[p0]-1
+            vn = pvers0[v0]
+            for vs in pdeps0[v0]
+                push!(red_deps, (Version(p, vn), vs))
+            end
+        end
+    end
+
+    reqsstruct = ReqsStruct(reqs, red_pkgs, red_vers, red_deps)
+    pkgstruct = PkgStruct(reqsstruct)
+    return reqsstruct, pkgstruct
+end
+
+function sanity_check()
+    reqsstruct0 = ReqsStruct(VersionSet[])
+    pkgstruct0 = PkgStruct(reqsstruct0)
+
+    eq_classes_map = prune_versions!(reqsstruct0, pkgstruct0, false)
+
+    pkgs = reqsstruct0.pkgs
+    vers = reqsstruct0.vers
+    deps = reqsstruct0.deps
+    np = reqsstruct0.np
+    spp = pkgstruct0.spp
+    pdict = pkgstruct0.pdict
+    pvers = pkgstruct0.pvers
+    vdict = pkgstruct0.vdict
+
+    pdeps = [ [ VersionSet[] for v0 = 1:spp[p0]-1 ] for p0 = 1:np ]
+    pndeps = [ zeros(Int,spp[p0]-1) for p0 = 1:np ]
+    for d in deps
+        p0, v0 = vdict[d[1]]
+        vs = d[2]
+        push!(pdeps[p0][v0], vs)
+        pndeps[p0][v0] += 1
+    end
+
+    rev_eq_classes_map = [ (VersionNumber=>Vector{VersionNumber})[] for p0 = 1:np ]
+    for p0 = 1:np
+        eqclass0 = eq_classes_map[p0]
+        reveqclass0 = rev_eq_classes_map[p0]
+        for (v,vtop) in eqclass0
+            if !has(reveqclass0, vtop)
+                reveqclass0[vtop] = VersionNumber[v]
+            else
+                push!(reveqclass0[vtop], v)
+            end
+        end
+    end
+
+    function vrank(v::Version)
+        p0, v0 = vdict[v]
+        return -pndeps[p0][v0]
+    end
+    svers = sort_by(vrank, vers)
+
+    nv = length(svers)
+    nnzv = findfirst(v->vrank(v)==0, svers) - 1
+
+    svdict = (Version=>Int)[]
+    i = 1
+    for v in svers
+        svdict[v] = i
+        i += 1
+    end
+    checked = falses(nv)
+
+    insane_ids = Array((Int,Int),0)
+
+    i = 1
+    psl = 0
+    for v in svers
+        vr = -vrank(v)
+        if vr == 0
+            break
+        end
+        @pkgres_testing begin
+            s = "[$i/$nnzv] $v"
+            sl = length(s)
+            gap = max(psl-sl,0)
+            print("\r" * s * " "^gap * "\b"^gap)
+            psl = sl
+        end
+        if checked[i]
+            i += 1
+            continue
+        elseif vr == 1
+            p0, v0 = vdict[v]
+            vs = pdeps[p0][v0][1]
+            p1 = pdict[vs.package]
+            found = false
+            for vn in pvers[p1]
+                if contains(vs, Version(vs.package, vn))
+                    found = true
+                    break
+                end
+            end
+            if !found
+                if PRT == "true"
+                    println(" : insane!")
+                    psl = 0
+                end
+                push!(insane_ids, (p0,v0))
+            else
+                checked[i] = true
+            end
+        else
+            PRT = @pkgres_testing_stash
+            reqsstruct, pkgstruct = substructs(reqsstruct0, pkgstruct0, pdeps, v)
+
+            graph = Graph(reqsstruct, pkgstruct)
+            msgs = Messages(reqsstruct, pkgstruct, graph)
+
+            local sol::Vector{Int}
+            try
+                sol = converge(graph, msgs)
+                verify_sol(reqsstruct, pkgstruct, sol)
+
+                red_pkgs = reqsstruct.pkgs
+                red_np = reqsstruct.np
+                red_spp = pkgstruct.spp
+                red_pvers = pkgstruct.pvers
+
+                for p0 = 1:red_np
+                    s0 = sol[p0]
+                    if s0 != red_spp[p0]
+                        j = svdict[Version(red_pkgs[p0], red_pvers[p0][s0])]
+                        checked[j] = true
+                    end
+                end
+                checked[i] = true
+            catch err
+                if isa(err, UnsatError)
+                    if PRT == "true"
+                        println(" : insane!")
+                        psl = 0
+                    end
+                    push!(insane_ids, vdict[v])
+                else
+                    rethrow(err)
+                end
+            finally
+                @pkgres_testing_set PRT
+            end
+        end
+        i += 1
+    end
+    println()
+
+    insane = Version[]
+    if !isempty(insane_ids)
+        for (p0,v0) in insane_ids
+            p = pkgs[p0]
+            vn = pvers[p0][v0]
+            for vneq in rev_eq_classes_map[p0][vn]
+                push!(insane, Version(p, vneq))
+            end
+        end
+        sort!(insane)
+        println("Insane packages:")
+        for v in insane
+            println("  $v")
+        end
+    end
+
+    return insane
 end
 
 end # module
