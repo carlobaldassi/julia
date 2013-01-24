@@ -10,7 +10,8 @@ import Base.<, Base.<=, Base.==, Base.-, Base.+,
        Base.zero, Base.isless, Base.abs, Base.typemin, Base.typemax,
        Base.indmax
 
-export resolve, @pkgres_dbg, @pkgres_testing_set
+export resolve, sanity_check, MetadataError,
+       @pkgres_dbg, @pkgres_testing_set
 
 macro pkgres_dbg(expr)
     quote
@@ -59,6 +60,11 @@ end
 # An exception type used internally to signal that an unsatisfiable
 # constraint was detected
 type UnsatError <: Exception
+    info
+end
+
+type MetadataError <: Exception
+    info
 end
 
 # Some parameters to drive the decimation process
@@ -409,9 +415,11 @@ function prune_versions!(reqsstruct::ReqsStruct, pkgstruct::PkgStruct, prune_req
             if !isempty(cl)
                 vtop0 = cl[end]
                 push!(pruned0, vtop0)
-                vtop = pvers0[vtop0]
-                for v0 in cl
-                    eqclass0[pvers0[v0]] = vtop
+                if !prune_reqs
+                    vtop = pvers0[vtop0]
+                    for v0 in cl
+                        eqclass0[pvers0[v0]] = vtop
+                    end
                 end
             end
         end
@@ -823,7 +831,7 @@ function getsolution(msgs::Messages)
         fld0 = fld[p0]
         s0 = indmax(fld0)
         if !validmax(fld0[s0])
-            throw(UnsatError())
+            throw(UnsatError(p0))
         end
         sol[p0] = s0
     end
@@ -906,7 +914,7 @@ function update(p0::Int, graph::Graph, msgs::Messages)
         if !validmax(m)
             # No state available without violating some
             # hard constraint
-            throw(UnsatError())
+            throw(UnsatError(p1))
         end
 
         # normalize the new message
@@ -1253,7 +1261,9 @@ function resolve(reqs)
         sol = converge(graph, msgs)
     catch err
         if isa(err, UnsatError)
-            msg = "Unsatisfiable package requirements detected"
+            p = reqsstruct.pkgs[err.info]
+            msg = "Unsatisfiable package requirements detected: " *
+                  "no feasible version could be found for package: $p"
             if msgs.num_nondecimated != graph.np
                 msg *= "\n  (you may try increasing the value of the" *
                        "\n   JULIA_PKGRESOLVE_ACCURACY environment variable)"
@@ -1384,6 +1394,7 @@ function sanity_check()
     checked = falses(nv)
 
     insane_ids = Array((Int,Int),0)
+    problematic_pkgs = String[]
 
     i = 1
     psl = 0
@@ -1414,11 +1425,13 @@ function sanity_check()
                 end
             end
             if !found
+                pp = vs.package
                 if PRT == "true"
-                    println(" : insane!")
+                    println(" : insane! (problematic $pp)")
                     psl = 0
                 end
                 push!(insane_ids, (p0,v0))
+                push!(problematic_pkgs, pp)
             else
                 checked[i] = true
             end
@@ -1429,15 +1442,15 @@ function sanity_check()
             graph = Graph(reqsstruct, pkgstruct)
             msgs = Messages(reqsstruct, pkgstruct, graph)
 
+            red_pkgs = reqsstruct.pkgs
+            red_np = reqsstruct.np
+            red_spp = pkgstruct.spp
+            red_pvers = pkgstruct.pvers
+
             local sol::Vector{Int}
             try
                 sol = converge(graph, msgs)
                 verify_sol(reqsstruct, pkgstruct, sol)
-
-                red_pkgs = reqsstruct.pkgs
-                red_np = reqsstruct.np
-                red_spp = pkgstruct.spp
-                red_pvers = pkgstruct.pvers
 
                 for p0 = 1:red_np
                     s0 = sol[p0]
@@ -1449,11 +1462,13 @@ function sanity_check()
                 checked[i] = true
             catch err
                 if isa(err, UnsatError)
+                    pp = red_pkgs[err.info]
                     if PRT == "true"
-                        println(" : insane!")
+                        println(" : insane! (problematic $pp)")
                         psl = 0
                     end
                     push!(insane_ids, vdict[v])
+                    push!(problematic_pkgs, pp)
                 else
                     rethrow(err)
                 end
@@ -1465,23 +1480,23 @@ function sanity_check()
     end
     println()
 
-    insane = Version[]
+    insane = Array((Version,String), 0)
     if !isempty(insane_ids)
+        i = 1
         for (p0,v0) in insane_ids
             p = pkgs[p0]
             vn = pvers[p0][v0]
+            pp = problematic_pkgs[i]
             for vneq in rev_eq_classes_map[p0][vn]
-                push!(insane, Version(p, vneq))
+                push!(insane, (Version(p, vneq), pp))
             end
+            i += 1
         end
-        sort!(insane)
-        println("Insane packages:")
-        for v in insane
-            println("  $v")
-        end
+        sort_by!(x->x[1], insane)
+        throw(MetadataError(insane))
     end
 
-    return insane
+    return
 end
 
 end # module

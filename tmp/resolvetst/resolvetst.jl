@@ -15,6 +15,8 @@ println()
 #  3) GENSEED : seed used in generators
 
 function main()
+    Resolve.@pkgres_testing_set "true"
+
     MetadataGen.generate()
 
     println("SEED = ", ENV["GENSEED"])
@@ -27,8 +29,6 @@ function main()
     reqs = Metadata.parse_requires("reqs.txt")
     sort!(reqs)
 
-    Resolve.@pkgres_testing_set "true"
-
     Resolve.@pkgres_dbg begin
         println("REQS:")
         for r in reqs
@@ -37,11 +37,11 @@ function main()
         println()
     end
 
-    println("Sanity check")
-    println("------------")
-    @time Resolve.sanity_check()
-    println("ok")
-    println()
+    #println("Sanity check")
+    #println("------------")
+    #@time Resolve.sanity_check()
+    #println("ok")
+    #println()
 
     linprog_want = nothing
     if get(ENV, "RUN_LINPROG", "true") == "true"

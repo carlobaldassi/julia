@@ -10,13 +10,15 @@ module MetadataGen
 import Metadata.Version, Metadata.VersionSet
 import Metadata.older
 
+import Resolve
+
 export generate, clean
 
 # GENERATION PARAMETERS
 
 rseed = int(get(ENV, "GENSEED", 1)) # random seed
 
-eot = 500
+eot = 1000
 pgen_new_pkg = 0.05
 
 pbump_major = 0.001
@@ -237,6 +239,67 @@ function generate()
         end
     end
     println()
+
+    issane = false
+    while !issane
+        issane = true
+
+        open("pkgs.txt", "w") do f
+            for p0 = 1:np
+                if !isempty(pvers[p0])
+                    println(f, Rpkgs[p0])
+                end
+            end
+        end
+
+        open("vers.txt", "w") do f
+            for p0 = 1:np
+                p = Rpkgs[p0]
+                for v in pvers[p0]
+                    println(f, "$p $v")
+                end
+            end
+        end
+
+        open("deps.txt", "w") do f
+            for p0 = 1:np
+                p = Rpkgs[p0]
+                for (w, vs) in pdeps[p0]
+                    vn = w[1]
+                    p1 = w[2]
+                    dvs = join([string(v) for v in vs], " ")
+                    println(f, "$p $vn $(Rpkgs[p1]) $dvs")
+                end
+            end
+        end
+
+        try
+            Resolve.sanity_check()
+        catch err
+            issane = false
+            if !isa(err, Resolve.MetadataError)
+                rethrow(err)
+            end
+            ins_vers = [ v for (v,pp) in err.info ]
+            for p0 = 1:np
+                p = Rpkgs[p0]
+                pvers0 = pvers[p0]
+                for v0 = length(pvers0):-1:1
+                    vn = pvers0[v0]
+                    if contains(ins_vers, Version(p, vn))
+                        delete!(pvers0, v0)
+                    end
+                end
+                pdeps0 = pdeps[p0]
+                for ((vn, p1), vs) in pdeps0
+                    if contains(ins_vers, Version(p, vn))
+                        delete!(pdeps0, (vn, p1))
+                    end
+                end
+            end
+        end
+    end
+
     reqs = Array(VersionSet, 0)
     for p0 = 1:np
         if rand() >= prequire
@@ -267,35 +330,6 @@ function generate()
         vj = VersionNumber(vi.major+1)
         r = VersionSet(p, [vi, vj])
         push!(reqs, r)
-    end
-
-    open("pkgs.txt", "w") do f
-        for p0 = 1:np
-            if !isempty(pvers[p0])
-                println(f, Rpkgs[p0])
-            end
-        end
-    end
-
-    open("vers.txt", "w") do f
-        for p0 = 1:np
-            p = Rpkgs[p0]
-            for v in pvers[p0]
-                println(f, "$p $v")
-            end
-        end
-    end
-
-    open("deps.txt", "w") do f
-        for p0 = 1:np
-            p = Rpkgs[p0]
-            for (w, vs) in pdeps[p0]
-                vn = w[1]
-                p1 = w[2]
-                dvs = join([string(v) for v in vs], " ")
-                println(f, "$p $vn $(Rpkgs[p1]) $dvs")
-            end
-        end
     end
 
     open("reqs.txt", "w") do f
