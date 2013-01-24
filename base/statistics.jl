@@ -172,10 +172,7 @@ function histc(v::StridedVector, edg)
     last = edg[n]
     for x in v
         if !isless(last, x) && !isless(x, first)
-            i = search_sorted(edg, x)
-            while isless(x, edg[i])
-                i -= 1
-            end
+            i = searchsortedlast(edg, x)
             h[i] += 1
         end
     end
@@ -194,7 +191,7 @@ end
 ## order (aka, rank), resolving ties using the mean rank
 function tiedrank(v::AbstractArray)
     n     = length(v)
-    place = order(v)
+    place = sortperm(v)
     ord   = Array(Float64, n)
 
     i = 1

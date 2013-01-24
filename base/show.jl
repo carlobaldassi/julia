@@ -6,7 +6,7 @@ print(io::IO, s::Symbol) = ccall(:jl_print_symbol, Void, (Ptr{Void}, Any,), io, 
 show(io::IO, x::ANY) = ccall(:jl_show_any, Void, (Any, Any,), io::Stream, x)
 
 showcompact(io::IO, x) = show(io, x)
-showcompact(x)     = showcompact(OUTPUT_STREAM::Stream, x)
+showcompact(x) = showcompact(OUTPUT_STREAM::Stream, x)
 
 macro show(exs...)
     blk = expr(:block)
@@ -794,7 +794,7 @@ function show_nd(io, a::AbstractArray)
 end
 
 function whos(m::Module, pattern::Regex)
-    for s in sort(map(string, names(m)))
+    for s in sort!(map(string, names(m)))
         v = symbol(s)
         if isdefined(m,v) && ismatch(pattern, s)
             println(rpad(s, 30), summary(eval(m,v)))

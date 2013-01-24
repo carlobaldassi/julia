@@ -32,13 +32,17 @@ end
 @deprecate  uc            uppercase
 @deprecate  nCr           binomial
 @deprecate  julia_pkgdir  Pkg.dir
+@deprecate  tintersect    typeintersect
 @deprecate  chi2rnd       randchi2
 @deprecate  betarnd       randbeta
 @deprecate  exprnd        randexp
+@deprecate  searchsorted  searchsortedfirst
+
+export randi, randival, randexp, randg, randbeta, randchi2
 
 randi(x...) = error("randi is deprecated. Instead use: rand(r::Range)")
 
-randival(x...) = error("randi is deprecated. Instead use: rand(r::Range)")
+randival(x...) = error("randival is deprecated. Instead use: rand(r::Range)")
 
 randexp(x...) = error("randexp is deprecated. Instead use the Distributions package:
     using Distributions; rand(Exponential())")
@@ -49,6 +53,5 @@ randg(x...) = error("randg is deprecated. Instead use the Distributions package:
 randbeta(x...) = error("randbeta is deprecated. Instead use the Distributions package:
     using Distributions; rand(Beta)")
 
-randchi2(x...) = error("randbeta is deprecated. Instead use the Distributions package:
+randchi2(x...) = error("randchi2 is deprecated. Instead use the Distributions package:
     using Distributions; rand(Chisq())")
-

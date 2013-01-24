@@ -82,7 +82,7 @@
 ; operators that are special forms, not function names
 (define syntactic-operators
   '(= := += -= *= /= //= .//= .*= ./= |\\=| |.\\=| ^= .^= %= |\|=| &= $= =>
-      <<= >>= >>>= -> --> |\|\|| && |::| |.|))
+      <<= >>= >>>= -> --> |\|\|| && |::| |.| ...))
 (define syntactic-unary-operators '($ &))
 
 (define reserved-words '(begin while if for try return break continue
@@ -990,7 +990,7 @@
 		 body))))
     ((export)
      (let ((es (map macrocall-to-atsym
-		    (parse-comma-separated-assignments s))))
+		    (parse-comma-separated s parse-atom))))
        (if (not (every symbol? es))
 	   (error "invalid export statement"))
        `(export ,@es)))

@@ -51,10 +51,10 @@ include("expr.jl")
 include("error.jl")
 
 # core numeric operations & types
+include("promotion.jl")
 include("bool.jl")
 include("number.jl")
 include("int.jl")
-include("promotion.jl")
 include("operators.jl")
 include("pointer.jl")
 
@@ -106,7 +106,8 @@ include("build_h.jl")
 include("osutils.jl")
 include("libc.jl")
 include("env.jl")
-include("errno_h.jl")
+include("errno.jl")
+using Errno
 include("file.jl")
 include("path.jl")
 include("stat.jl")
@@ -158,6 +159,10 @@ include("linalg_sparse.jl")
 include("fftw.jl")
 include("dsp.jl")
 importall DSP
+
+# BigInts and BigFloats
+include("gmp.jl")
+importall GMP
 
 # deprecated functions
 include("deprecated.jl")

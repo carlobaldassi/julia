@@ -993,7 +993,7 @@ function decimate(n::Int, graph::Graph, msgs::Messages)
     @pkgres_testing_println("DECIMATING $n NODES")
     fld = msgs.fld
     decimated = msgs.decimated
-    fldorder = Sort.sortperm_by(secondmax, fld)[2]
+    fldorder = sortperm(Sort.By(secondmax), fld)
     for p0 in fldorder
         if decimated[p0]
             continue
@@ -1281,6 +1281,8 @@ function resolve(reqs)
     return compute_output_dict(reqsstruct, pkgstruct, sol)
 end
 
+# Build a subgraph incuding only the (direct and indirect) dependencies
+# of a given package (used in check_sanity)
 function substructs(reqsstruct0::ReqsStruct, pkgstruct0::PkgStruct, pdeps::Vector, v::Version)
 
     pkgs = reqsstruct0.pkgs
@@ -1339,6 +1341,7 @@ function substructs(reqsstruct0::ReqsStruct, pkgstruct0::PkgStruct, pdeps::Vecto
     return reqsstruct, pkgstruct
 end
 
+# Scan dependencies for (explicit or implicit) contradictions
 function sanity_check()
     reqsstruct0 = ReqsStruct(VersionSet[])
     pkgstruct0 = PkgStruct(reqsstruct0)
@@ -1380,7 +1383,7 @@ function sanity_check()
         p0, v0 = vdict[v]
         return -pndeps[p0][v0]
     end
-    svers = sort_by(vrank, vers)
+    svers = sort(Sort.By(vrank), vers)
 
     nv = length(svers)
     nnzv = findfirst(v->vrank(v)==0, svers) - 1
@@ -1492,7 +1495,7 @@ function sanity_check()
             end
             i += 1
         end
-        sort_by!(x->x[1], insane)
+        sort!(Sort.By(x->x[1]), insane)
         throw(MetadataError(insane))
     end
 

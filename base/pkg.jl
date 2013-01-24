@@ -17,7 +17,7 @@ const DEFAULT_META = "git://github.com/JuliaLang/METADATA.jl.git"
 
 @unix_only dir() = abspath(get(ENV,"JULIA_PKGDIR",joinpath(ENV["HOME"],".julia")))
 @windows_only begin
-    dir() = abspath(get(ENV,"JULIA_PKGDIR",joinpath(JULIA_USER_DATA_DIR,"packages")))
+    dir() = abspath(get(ENV,"JULIA_PKGDIR",joinpath(ENV["HOME"],"packages")))
 end
 dir(pkg::String...) = joinpath(dir(),pkg...)
 
@@ -652,6 +652,23 @@ end
 function package_directory(pkg::String)
     warn("Pkg.package_directory is deprecated, use Pkg.dir instead.")
     joinpath(dir(), pkg)
+end
+
+# Repository sanity check
+check_repository() = cd_pkgdir() do
+    try
+        Resolve.sanity_check()
+    catch err
+        if !isa(err, Resolve.MetadataError)
+            rethrow(err)
+        end
+        println("Packages with unsatisfiable requirements found:")
+        for (v, pp) in err.info
+            println("  $(v.package) v$(v.version) : no valid versions exist for package $pp")
+        end
+        return false
+    end
+    return true
 end
 
 end # module
