@@ -26,7 +26,12 @@ export # not exported by Base
     Algorithm,
         InsertionSort,
         QuickSort,
-        MergeSort
+        MergeSort,
+        TimSort,
+    DEFAULT_UNSTABLE,
+    DEFAULT_STABLE,
+    SMALL_ALGORITHM,
+    SMALL_THRESHOLD
 
 ## notions of element ordering ##
 
@@ -64,7 +69,7 @@ function select!(o::Ordering, v::AbstractVector, k::Int, lo::Int, hi::Int)
             return v[lo]
         end
         i, j = lo, hi
-        pivot = v[(lo+hi)>>>1]
+        pivot = v[rand(lo:hi)] # v[(lo+hi)>>>1]
         while i < j
             while lt(o, v[i], pivot); i += 1; end
             while lt(o, pivot, v[j]); j -= 1; end
@@ -147,15 +152,21 @@ abstract Algorithm
 type InsertionSort <: Algorithm end
 type QuickSort     <: Algorithm end
 type MergeSort     <: Algorithm end
+type TimSort       <: Algorithm end
+
+const DEFAULT_UNSTABLE = QuickSort()
+const DEFAULT_STABLE   = MergeSort()
+const SMALL_ALGORITHM  = InsertionSort()
+const SMALL_THRESHOLD  = 20
 
 sort!(a::Algorithm, o::Ordering, v::AbstractVector) = sort!(a, o, v, 1, length(v))
 sort (a::Algorithm, o::Ordering, v::AbstractVector) = sort!(a, o, copy(v))
 
-sort!{T<:Number}(o::Ordering, v::AbstractVector{T}) = sort!(QuickSort(), o, v)
-sort {T<:Number}(o::Ordering, v::AbstractVector{T}) = sort (QuickSort(), o, v)
+sort!{T<:Number}(o::Ordering, v::AbstractVector{T}) = sort!(DEFAULT_UNSTABLE, o, v)
+sort {T<:Number}(o::Ordering, v::AbstractVector{T}) = sort (DEFAULT_UNSTABLE, o, v)
 
-sort!(o::Ordering, v::AbstractVector) = sort!(MergeSort(), o, v)
-sort (o::Ordering, v::AbstractVector) = sort (MergeSort(), o, v)
+sort!(o::Ordering, v::AbstractVector) = sort!(DEFAULT_STABLE, o, v)
+sort (o::Ordering, v::AbstractVector) = sort (DEFAULT_STABLE, o, v)
 
 function sort!(::InsertionSort, o::Ordering, v::AbstractVector, lo::Int, hi::Int)
     for i = lo+1:hi
@@ -174,13 +185,13 @@ function sort!(::InsertionSort, o::Ordering, v::AbstractVector, lo::Int, hi::Int
     return v
 end
 
-function sort!(::QuickSort, o::Ordering, v::AbstractVector, lo::Int, hi::Int)
+function sort!(a::QuickSort, o::Ordering, v::AbstractVector, lo::Int, hi::Int)
     while hi > lo
-        if hi-lo <= 20
-            return sort!(InsertionSort(), o, v, lo, hi)
+        if hi-lo <= SMALL_THRESHOLD
+            return sort!(SMALL_ALGORITHM, o, v, lo, hi)
         end
+        pivot = v[rand(lo:hi)] # v[(lo+hi)>>>1]
         i, j = lo, hi
-        pivot = v[(lo+hi)>>>1]
         while i <= j
             while lt(o, v[i], pivot); i += 1; end
             while lt(o, pivot, v[j]); j -= 1; end
@@ -191,22 +202,22 @@ function sort!(::QuickSort, o::Ordering, v::AbstractVector, lo::Int, hi::Int)
             end
         end
         if lo < j
-            sort!(QuickSort(), o, v, lo, j)
+            sort!(a, o, v, lo, j)
         end
         lo = i
     end
     return v
 end
 
-function sort!(::MergeSort, o::Ordering, v::AbstractVector, lo::Int, hi::Int, t::AbstractVector)
+function sort!(a::MergeSort, o::Ordering, v::AbstractVector, lo::Int, hi::Int, t::AbstractVector)
     if lo < hi
-        if hi-lo <= 20
-            return sort!(InsertionSort(), o, v, lo, hi)
+        if hi-lo <= SMALL_THRESHOLD
+            return sort!(SMALL_ALGORITHM, o, v, lo, hi)
         end
 
         m = (lo+hi)>>>1
-        sort!(MergeSort(), o, v, lo,  m,  t)
-        sort!(MergeSort(), o, v, m+1, hi, t)
+        sort!(a, o, v, lo,  m,  t)
+        sort!(a, o, v, m+1, hi, t)
 
         i = 1
         j = lo
@@ -239,6 +250,8 @@ function sort!(::MergeSort, o::Ordering, v::AbstractVector, lo::Int, hi::Int, t:
 end
 sort!(a::MergeSort, o::Ordering, v::AbstractVector, lo::Int, hi::Int) = sort!(a,o,v,lo,hi,similar(v))
 
+include("timsort.jl")
+
 ## sortperm: the permutation to sort an array ##
 
 type Perm{O<:Ordering,V<:AbstractVector} <: Ordering
@@ -250,7 +263,7 @@ Perm{O<:Ordering,V<:AbstractVector}(o::O,v::V) = Perm{O,V}(o,v)
 lt(p::Perm, a, b) = lt(p.ord, p.vec[a], p.vec[b])
 
 sortperm(a::Algorithm, o::Ordering, v::AbstractVector) = sort(a, Perm(o,v), [1:length(v)])
-sortperm(o::Ordering, v::AbstractVector) = sortperm(MergeSort(), o, v)
+sortperm(o::Ordering, v::AbstractVector) = sortperm(DEFAULT_STABLE, o, v)
 
 # generic sorting methods
 

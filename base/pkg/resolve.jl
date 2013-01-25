@@ -1429,7 +1429,7 @@ function sanity_check()
             end
             if !found
                 pp = vs.package
-                if PRT == "true"
+                @pkgres_testing begin
                     println(" : insane! (problematic $pp)")
                     psl = 0
                 end
@@ -1481,7 +1481,7 @@ function sanity_check()
         end
         i += 1
     end
-    println()
+    @pkgres_testing_println()
 
     insane = Array((Version,String), 0)
     if !isempty(insane_ids)

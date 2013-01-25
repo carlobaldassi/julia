@@ -4,7 +4,7 @@ macro deprecate(oldf,newf)
     expr(:toplevel,
         expr(:export,esc(oldf)),
         :(function $(esc(oldf))(args...)
-              warn(strcat($oldname," is deprecated, use ",$newname," instead."))
+              warn(string($oldname," is deprecated, use ",$newname," instead."))
               $(esc(newf))(args...)
           end))
 end
@@ -37,6 +37,12 @@ end
 @deprecate  betarnd       randbeta
 @deprecate  exprnd        randexp
 @deprecate  searchsorted  searchsortedfirst
+@deprecate  choose        first
+@deprecate  system        run
+#@deprecate  strcat        string
+
+export strcat
+strcat(xs...) = string(xs...)
 
 export randi, randival, randexp, randg, randbeta, randchi2
 
